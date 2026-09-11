@@ -1,0 +1,9 @@
+POST  http://localhost:3779/api/auth/register
+Content-Type: application/json
+{
+  "firstName": "string (min 3 chars, required)",
+  "lastName": "string (min 3 chars, required)",
+  "email": "string (valid email, required)",
+  "password": "string (min 6 chars, required)"
+}
+
