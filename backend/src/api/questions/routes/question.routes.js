@@ -57,4 +57,52 @@ router.get(
   searchQuestionsSemanticController,
 );
 
+/**
+ * @route POST /api/questions/draft-coach
+ * @desc AI suggestions for a question draft (title + body)
+ * @access Private
+ */
+router.post(
+  '/draft-coach',
+  authenticateUser,
+  generateQuestionDraftCoachValidation,
+  generateQuestionDraftCoachController,
+);
+
+/**
+ * @route GET /api/questions/:questionHash/similar
+ * @desc Get similar questions based on vector embeddings
+ * @access Private
+ */
+router.get(
+  '/:questionHash/similar',
+  authenticateUser,
+  getSimilarQuestionsValidation,
+  getSimilarQuestionsController,
+);
+
+/**
+ * @route POST /api/questions/:questionHash/answer-fit
+ * @desc AI relevance check for an answer draft vs the question
+ * @access Private
+ */
+router.post(
+  '/:questionHash/answer-fit',
+  authenticateUser,
+  assessAnswerAgainstQuestionValidation,
+  assessAnswerAgainstQuestionController,
+);
+
+/**
+ * @route GET /api/questions/:questionHash
+ * @desc Get one question with answers
+ * @access Private
+ */
+router.get(
+  '/:questionHash',
+  authenticateUser,
+  getSingleQuestionValidation,
+  getSingleQuestionController,
+);
+
 export default router;
