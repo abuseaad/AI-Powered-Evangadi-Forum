@@ -1,6 +1,6 @@
 import crypto from 'crypto';    //is a built-in Node.js tool for random/security-related operations
 import { safeExecute } from '../../../../db/config.js';
-import { BadRequestError, NotFoundError } from '../../../../utils/errors/index.js';
+import { BadRequestError, NotFoundError } from '../../../utils/errors/index.js';
 import {
   findSimilarQuestionsByQuestionId,
   findSimilarQuestionsByText,
@@ -8,8 +8,7 @@ import {
   getVectorConfig,
   normalizeQuestionText,
   storeQuestionVector,
-} from './vectore.service.js';
-
+} from './vector.service.js';
 
 /**
  * !crypto.randomBytes(8) — generate 8 random bytes (raw binary data).
@@ -234,7 +233,8 @@ if (!includeAnswers) {
     };
 }
 
-  const questionId = question.id;
+  // const questionId = question.id;
+    const questionId = questionRows[0].id;
 
 const answersSql = `
   SELECT
@@ -255,17 +255,17 @@ const answers = await safeExecute(answersSql, [questionId]);
 
 return {
   question: {
-    id: question.id,
-    questionHash: question.questionHash,
-    title: question.title,
-    content: question.content,
-    answerCount: question.answerCount,
-    createdAt: question.createdAt,
-    updatedAt: question.updatedAt,
+    id: questionRows[0].id,
+    questionHash: questionRows[0].questionHash,
+    title: questionRows[0].title,
+    content: questionRows[0].content,
+    answerCount: questionRows[0].answerCount,
+    createdAt: questionRows[0].createdAt,
+    updatedAt: questionRows[0].updatedAt,
     author: {
-      id: question.userId,
-      firstName: question.firstName,
-      lastName: question.lastName,
+      id: questionRows[0].userId,
+      firstName: questionRows[0].firstName,
+      lastName: questionRows[0].lastName,
     },
  },
     answers: answers.map(answer => ({

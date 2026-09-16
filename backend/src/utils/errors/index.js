@@ -26,6 +26,13 @@ export class UnauthenticatedError extends CustomAPIError {
     this.statusCode = StatusCodes.UNAUTHORIZED; // 401
   }
 }
+// Added by me
+export class ForbiddenError extends CustomAPIError {
+  constructor(message) {
+    super(message);
+    this.statusCode = StatusCodes.FORBIDDEN; // 403
+  }
+}
 
 export class ServiceUnavailableError extends CustomAPIError {
   constructor(message) {

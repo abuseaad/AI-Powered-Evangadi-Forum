@@ -46,10 +46,6 @@ export const registerService = async ({
   password,
 }) => {
   const normalizedEmail = normalizeEmail(email);
-  const userExists = await checkUserExists(normalizedEmail);
-  if (userExists) {
-    throw new BadRequestError("User already exists with this email.");
-  }
 
   // every time we call bcrypt.genSalt, it generates a new random salt string.
   const salt = await bcrypt.genSalt(10); // generates a unique random salt each call
@@ -70,8 +66,8 @@ export const registerService = async ({
     }
     throw error;
   }
-  
 
+ // Success! Return the created user
   return {
     id: result.insertId,
     firstName,
