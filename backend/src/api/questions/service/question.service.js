@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import crypto from 'crypto';    //is a built-in Node.js tool for random/security-related operations
 import { safeExecute } from '../../../../db/config.js';
 import { BadRequestError, NotFoundError } from '../../../../utils/errors/index.js';
 import {
@@ -8,7 +8,14 @@ import {
   getVectorConfig,
   normalizeQuestionText,
   storeQuestionVector,
-} from './vector.service.js';
+} from './vectore.service.js';
+
+
+/**
+ * !crypto.randomBytes(8) — generate 8 random bytes (raw binary data).
+.toString('hex') — convert those bytes into a readable hexadecimal string (characters 0-9a-f), producing something like "9f2a1c7b3e4d0812" (16 characters, since each byte = 2 hex characters).
+ * 
+ */
 
 const generateQuestionHash = () => crypto.randomBytes(8).toString('hex');
 
@@ -20,6 +27,8 @@ const generateQuestionHash = () => crypto.randomBytes(8).toString('hex');
  * @param {string} payload.content - Content/body of the question
  * @returns {Promise<Object>} Object containing the created question
  */
+
+// !runs when a user posts a question
 export const createQuestionWithVectorService = async payload => {
   // Extract required fields from the payload
   const { userId, title, content } = payload;
@@ -106,7 +115,7 @@ const buildQuestionFilters = filters => {
   const conditions = [];
   const params = [];
 
-  if (filters.search) {
+  if (filters.search) {              //GET /api/questions?search=react)
     conditions.push('(q.title LIKE ? OR q.content LIKE ?)');
     const searchTerm = `%${filters.search}%`;
     params.push(searchTerm, searchTerm);
@@ -118,7 +127,7 @@ const buildQuestionFilters = filters => {
   }
 
   if (conditions.length === 0) {
-    return { whereClause: '', params };
+    return { whereClause: '', params };  //return an empty whereClause (no filtering at all, meaning "get all questions")
   }
 
   return {
@@ -132,8 +141,14 @@ export const getQuestionsService = async filters => {
   const sortColumn = 'q.created_at';
   const normalizedSortOrder = 'DESC';
 
+
+  // Getting the filters
   const { whereClause, params } = buildQuestionFilters(filters);
 
+
+  //DISTINCT prevents double-counting
+  //JOIN: combines matching rows from two tables
+  //LEFT JOIN: keeps all rows from the main table even without a match in the joined table
   const listSql = `
     SELECT
       q.question_id AS id,
@@ -145,7 +160,7 @@ export const getQuestionsService = async filters => {
       u.user_id AS userId,
       u.first_name AS firstName,
       u.last_name AS lastName,
-      COUNT(DISTINCT a.answer_id) AS answerCount
+      COUNT(DISTINCT a.answer_id) AS answerCount    
     FROM questions q
     JOIN users u ON u.user_id = q.user_id
     LEFT JOIN answers a ON a.question_id = q.question_id
@@ -157,6 +172,8 @@ export const getQuestionsService = async filters => {
 
   const rows = await safeExecute(listSql, params);
 
+
+  // Shaping the response
   return {
     data: rows.map(question => ({
       id: question.id,
@@ -181,6 +198,7 @@ export const getQuestionsService = async filters => {
   };
 };
 
+//GET /api/questions/:questionHash
 export const getSingleQuestionService = async ({ 
     questionHash,
      includeAnswers = true,

@@ -117,7 +117,7 @@ export const loginService = async ({ email, password }) => {
 
   // jwt.sign(...) builds the token in 3 parts (header, payload, signature) and returns it as one long string like xxxxx.yyyyy.zzzzz.
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-
+console.log(token)
   return {
     user: {
       id: user.user_id,

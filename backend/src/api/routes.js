@@ -1,15 +1,15 @@
-import express from 'express';
-import authRoutes from './auth/routes/auth.routes.js';
-import questionsRoutes from './question/routes/question.routes.js';
-import answersRoutes from './answer/routes/answer.routes.js';
+import express from "express";
+import authRoutes from "./auth/routes/auth.routes.js";
+import answerRoutes from "./answer/routes/answer.route.js";
+import questionRoutes from "./question/routes/question.route.js";
 
 export const mainRouter = express.Router();
 
-// /api/auth
-mainRouter.use('/auth', authRoutes);
+// Authentication routes
+mainRouter.use("/auth", authRoutes);
 
-// /api/questions
-mainRouter.use('/questions', questionsRoutes);
+// Answer routes
+mainRouter.use("/answers", answerRoutes);
 
-// /api/answers
-mainRouter.use('/answers', answersRoutes);
+// Question routes
+mainRouter.use("/questions", questionRoutes);

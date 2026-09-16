@@ -1,108 +1,62 @@
-import express from 'express';
+import express from "express";
+import { authenticateUser } from "../../../middleware/authentication.js";
 import {
   createQuestionController,
-  getSimilarQuestionsController,
   getQuestionsController,
-  searchQuestionsSemanticController,
   getSingleQuestionController,
+  searchQuestionsSemanticController,
+  getSimilarQuestionsController,
   generateQuestionDraftCoachController,
   assessAnswerAgainstQuestionController,
-} from '../controller/question.controller.js';
+} from "../controller/question.controller.js";
 import {
   createQuestionValidation,
-  getSimilarQuestionsValidation,
   getQuestionsValidation,
-  searchQuestionsSemanticValidation,
   getSingleQuestionValidation,
-  generateQuestionDraftCoachValidation,
-  assessAnswerAgainstQuestionValidation,
-} from '../validations/question.validation.js';
-import { authenticateUser } from '../../../middleware/authentication.js';
+  searchQuestionsSemanticValidation,
+} from "../validation/question.validation.js";
 
 const router = express.Router();
 
-/**
- * @route POST /api/questions
- * @desc Post a new question
- * @access Protected
- */
-router.post(
-  '/',
-  authenticateUser,
-  createQuestionValidation,
-  createQuestionController,
-);
+router.use(authenticateUser);
 
-/**
- * @route GET /api/questions
- * @desc Get questions with optional search filtering
- * @access Private
- */
-router.get(
-  '/',
-  authenticateUser,
-  getQuestionsValidation,
-  getQuestionsController,
-);
+// POST /api/questions
+router.post("/", createQuestionValidation, createQuestionController);
 
-/**
- * @route GET /api/questions/search
- * @desc Semantic search for questions using vector embeddings based on a text query
- * @access Private
- */
+// GET /api/questions
+router.get("/", getQuestionsValidation, getQuestionsController);
+
+// GET /api/questions/search?query=...
+// Defined before /:questionHash so "search" is not captured as a hash param
 router.get(
-  '/search',
-  authenticateUser,
+  "/search",
   searchQuestionsSemanticValidation,
   searchQuestionsSemanticController,
 );
 
-/**
- * @route POST /api/questions/draft-coach
- * @desc AI suggestions for a question draft (title + body)
- * @access Private
- */
-router.post(
-  '/draft-coach',
-  authenticateUser,
-  generateQuestionDraftCoachValidation,
-  generateQuestionDraftCoachController,
+// POST /api/questions/draft-coach
+// Defined before /:questionHash so "draft-coach" is not captured as a hash param
+router.post("/draft-coach", generateQuestionDraftCoachController);
+
+// GET /api/questions/:questionHash
+router.get(
+  "/:questionHash",
+  getSingleQuestionValidation,
+  getSingleQuestionController,
 );
 
-/**
- * @route GET /api/questions/:questionHash/similar
- * @desc Get similar questions based on vector embeddings
- * @access Private
- */
+// GET /api/questions/:questionHash/similar
 router.get(
-  '/:questionHash/similar',
-  authenticateUser,
-  getSimilarQuestionsValidation,
+  "/:questionHash/similar",
+  getSingleQuestionValidation,
   getSimilarQuestionsController,
 );
 
-/**
- * @route POST /api/questions/:questionHash/answer-fit
- * @desc AI relevance check for an answer draft vs the question
- * @access Private
- */
+// POST /api/questions/:questionHash/answer-fit
 router.post(
-  '/:questionHash/answer-fit',
-  authenticateUser,
-  assessAnswerAgainstQuestionValidation,
-  assessAnswerAgainstQuestionController,
-);
-
-/**
- * @route GET /api/questions/:questionHash
- * @desc Get one question with answers
- * @access Private
- */
-router.get(
-  '/:questionHash',
-  authenticateUser,
+  "/:questionHash/answer-fit",
   getSingleQuestionValidation,
-  getSingleQuestionController,
+  assessAnswerAgainstQuestionController,
 );
 
 export default router;
