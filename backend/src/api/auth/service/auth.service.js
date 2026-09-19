@@ -1,20 +1,19 @@
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { safeExecute } from "../../../../db/config.js";
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { safeExecute } from '../../../../db/config.js';
 import {
   BadRequestError,
   UnauthenticatedError,
-} from "../../../utils/errors/index.js";
+} from '../../../utils/errors/index.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1d";
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1d';
 
-// Runtime timing note: this code runs once, the moment this file is first loaded (when the server starts) — not every time someone logs in.
 if (!JWT_SECRET) {
-  throw new Error("JWT_SECRET environment variable is required");
+  throw new Error('JWT_SECRET environment variable is required');
 }
 
-const normalizeEmail = (email) => email.trim().toLowerCase();
+const normalizeEmail = email => email.trim().toLowerCase();
 
 /**
  * Checks if a user exists by email.
@@ -22,9 +21,9 @@ const normalizeEmail = (email) => email.trim().toLowerCase();
  * @param {string} email - The email to check.
  * @returns {Promise<boolean>} True if the user exists, false otherwise.
  */
-export const checkUserExists = async (email) => {
+export const checkUserExists = async email => {
   const normalizedEmail = normalizeEmail(email);
-  const sql = "SELECT user_id FROM users WHERE email = ? "; //if you want LIMIT 1
+  const sql = 'SELECT user_id FROM users WHERE email = ? LIMIT 1';
   const rows = await safeExecute(sql, [normalizedEmail]);
   return rows.length > 0;
 };
@@ -46,12 +45,16 @@ export const registerService = async ({
   password,
 }) => {
   const normalizedEmail = normalizeEmail(email);
+  const userExists = await checkUserExists(normalizedEmail);
+  if (userExists) {
+    throw new BadRequestError('User already exists with this email.');
+  }
 
   // every time we call bcrypt.genSalt, it generates a new random salt string.
   const salt = await bcrypt.genSalt(10); // generates a unique random salt each call
   const hashedPassword = await bcrypt.hash(password, salt);
   const sql =
-    "INSERT INTO users (first_name, last_name, email, password_hash) VALUES (?, ?, ?, ?)";
+    'INSERT INTO users (first_name, last_name, email, password_hash) VALUES (?, ?, ?, ?)';
   let result;
   try {
     result = await safeExecute(sql, [
@@ -61,13 +64,12 @@ export const registerService = async ({
       hashedPassword,
     ]);
   } catch (error) {
-    if (error?.code === "ER_DUP_ENTRY") {
-      throw new BadRequestError("User already exists with this email.");
+    if (error?.code === 'ER_DUP_ENTRY') {
+      throw new BadRequestError('User already exists with this email.');
     }
     throw error;
   }
 
- // Success! Return the created user
   return {
     id: result.insertId,
     firstName,
@@ -88,32 +90,28 @@ export const registerService = async ({
 export const loginService = async ({ email, password }) => {
   const normalizedEmail = normalizeEmail(email);
   const sql =
-    "SELECT user_id, first_name, last_name, email, password_hash FROM users WHERE email = ? ";
+    'SELECT user_id, first_name, last_name, email, password_hash FROM users WHERE email = ? LIMIT 1';
   const rows = await safeExecute(sql, [normalizedEmail]);
 
   if (rows.length === 0) {
-    throw new UnauthenticatedError("Invalid email or password");
+    throw new UnauthenticatedError('Invalid email or password');
   }
 
   const user = rows[0];
   const isMatch = await bcrypt.compare(password, user.password_hash);
 
   if (!isMatch) {
-    throw new UnauthenticatedError("Invalid email or password");
+    throw new UnauthenticatedError('Invalid email or password');
   }
 
-
-  // The payload is the actual data that will be embedded inside the token. Think of it as writing information on the ID badge itself.
-  //Notice what's not in there: no password, no password_hash, no email even. Only the minimum needed to identify the user later
   const payload = {
     id: user.user_id,
     firstName: user.first_name,
     lastName: user.last_name,
   };
 
-  // jwt.sign(...) builds the token in 3 parts (header, payload, signature) and returns it as one long string like xxxxx.yyyyy.zzzzz.
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-console.log(token)
+
   return {
     user: {
       id: user.user_id,

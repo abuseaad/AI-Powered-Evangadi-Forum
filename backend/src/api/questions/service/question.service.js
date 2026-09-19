@@ -1,6 +1,9 @@
-import crypto from 'crypto';    //is a built-in Node.js tool for random/security-related operations
-import { safeExecute } from '../../../../db/config.js';
-import { BadRequestError, NotFoundError } from '../../../utils/errors/index.js';
+import crypto from "crypto";
+import { safeExecute } from "../../../../db/config.js";
+import {
+  BadRequestError,
+  NotFoundError,
+} from "../../../utils/errors/index.js";
 import {
   findSimilarQuestionsByQuestionId,
   findSimilarQuestionsByText,
@@ -10,13 +13,7 @@ import {
   storeQuestionVector,
 } from './vector.service.js';
 
-/**
- * !crypto.randomBytes(8) — generate 8 random bytes (raw binary data).
-.toString('hex') — convert those bytes into a readable hexadecimal string (characters 0-9a-f), producing something like "9f2a1c7b3e4d0812" (16 characters, since each byte = 2 hex characters).
- * 
- */
-
-const generateQuestionHash = () => crypto.randomBytes(8).toString('hex');
+const generateQuestionHash = () => crypto.randomBytes(8).toString("hex");
 
 /**
  * Creates a new question and stores its vector embedding for semantic search.
@@ -26,15 +23,13 @@ const generateQuestionHash = () => crypto.randomBytes(8).toString('hex');
  * @param {string} payload.content - Content/body of the question
  * @returns {Promise<Object>} Object containing the created question
  */
-
-// !runs when a user posts a question
-export const createQuestionWithVectorService = async payload => {
+export const createQuestionWithVectorService = async (payload) => {
   // Extract required fields from the payload
   const { userId, title, content } = payload;
 
   // Prepare the SQL statement for inserting a new question
   const insertQuestionSql =
-    'INSERT INTO questions (question_hash, user_id, title, content) VALUES (?, ?, ?, ?)';
+    "INSERT INTO questions (question_hash, user_id, title, content) VALUES (?, ?, ?, ?)";
 
   // Generate a unique hash for the question
   const questionHash = generateQuestionHash();
@@ -50,8 +45,8 @@ export const createQuestionWithVectorService = async payload => {
     ]);
   } catch (error) {
     // Handle specific foreign key constraint error for non-existent user
-    if (error?.code === 'ER_NO_REFERENCED_ROW_2') {
-      throw new BadRequestError('User does not exist.');
+    if (error?.code === "ER_NO_REFERENCED_ROW_2") {
+      throw new BadRequestError("User does not exist.");
     }
     // Re-throw any other unexpected errors
     throw error;
@@ -70,38 +65,38 @@ export const createQuestionWithVectorService = async payload => {
   };
 
   // Normalize the question text (e.g., title) to prepare it for vector embedding
-const sourceText = normalizeQuestionText({
-  title: payload.title,
-});
-
-try {
-  // Generate the vector embedding for the normalized question text
-  const embeddingResult = await generateQuestionEmbedding(sourceText, {
-    questionId: creationResult.id,
+  const sourceText = normalizeQuestionText({
+    title: payload.title,
   });
 
-   // Store the generated vector embedding in the database with a 'ready' status
-  await storeQuestionVector({
-    questionId: creationResult.id,
-    sourceText,
-    embedding: embeddingResult.embedding,
-    status: 'ready',
-  });
-} catch (error) {
+  try {
+    // Generate the vector embedding for the normalized question text
+    const embeddingResult = await generateQuestionEmbedding(sourceText, {
+      questionId: creationResult.id,
+    });
+
+    // Store the generated vector embedding in the database with a 'ready' status
+    await storeQuestionVector({
+      questionId: creationResult.id,
+      sourceText,
+      embedding: embeddingResult.embedding,
+      status: "ready",
+    });
+  } catch (error) {
     // Log detailed error information if vector generation or storage fails
-    console.error('=== FAILED TO STORE VECTOR FOR QUESTION ===');
-    console.error('Question ID:', creationResult.id);
-    console.error('Operation: question creation');
-    console.error('Error:', error);
-    console.error('==========================================');
+    console.error("=== FAILED TO STORE VECTOR FOR QUESTION ===");
+    console.error("Question ID:", creationResult.id);
+    console.error("Operation: question creation");
+    console.error("Error:", error);
+    console.error("==========================================");
 
     // Explicitly record the failure state in the database so it can be retried or tracked later
     await storeQuestionVector({
       questionId: creationResult.id,
       sourceText,
       embedding: [],
-      status: 'failed',
-    }).catch(e => console.error('Failed to save failed status', e));
+      status: "failed",
+    }).catch((e) => console.error("Failed to save failed status", e));
 
     // Return the created question object
     return {
@@ -110,44 +105,38 @@ try {
   }
 };
 
-const buildQuestionFilters = filters => {
+const buildQuestionFilters = (filters) => {
   const conditions = [];
   const params = [];
 
-  if (filters.search) {              //GET /api/questions?search=react)
-    conditions.push('(q.title LIKE ? OR q.content LIKE ?)');
+  if (filters.search) {
+    conditions.push("(q.title LIKE ? OR q.content LIKE ?)");
     const searchTerm = `%${filters.search}%`;
     params.push(searchTerm, searchTerm);
   }
 
   if (filters.mine && filters.userId) {
-    conditions.push('q.user_id = ?');
+    conditions.push("q.user_id = ?");
     params.push(filters.userId);
   }
 
   if (conditions.length === 0) {
-    return { whereClause: '', params };  //return an empty whereClause (no filtering at all, meaning "get all questions")
+    return { whereClause: "", params };
   }
 
   return {
-    whereClause: `WHERE ${conditions.join(' AND ')}`,
+    whereClause: `WHERE ${conditions.join(" AND ")}`,
     params,
   };
 };
 
-export const getQuestionsService = async filters => {
+export const getQuestionsService = async (filters) => {
   const normalizedLimit = 100; // Fixed max 100 records
-  const sortColumn = 'q.created_at';
-  const normalizedSortOrder = 'DESC';
+  const sortColumn = "q.created_at";
+  const normalizedSortOrder = "DESC";
 
-
-  // Getting the filters
   const { whereClause, params } = buildQuestionFilters(filters);
 
-
-  //DISTINCT prevents double-counting
-  //JOIN: combines matching rows from two tables
-  //LEFT JOIN: keeps all rows from the main table even without a match in the joined table
   const listSql = `
     SELECT
       q.question_id AS id,
@@ -159,7 +148,7 @@ export const getQuestionsService = async filters => {
       u.user_id AS userId,
       u.first_name AS firstName,
       u.last_name AS lastName,
-      COUNT(DISTINCT a.answer_id) AS answerCount    
+      COUNT(DISTINCT a.answer_id) AS answerCount
     FROM questions q
     JOIN users u ON u.user_id = q.user_id
     LEFT JOIN answers a ON a.question_id = q.question_id
@@ -167,14 +156,12 @@ export const getQuestionsService = async filters => {
     GROUP BY q.question_id, u.user_id
     ORDER BY ${sortColumn} ${normalizedSortOrder}
     LIMIT ${normalizedLimit}
-  `;   
+  `;
 
   const rows = await safeExecute(listSql, params);
 
-
-  // Shaping the response
   return {
-    data: rows.map(question => ({
+    data: rows.map((question) => ({
       id: question.id,
       questionHash: question.questionHash,
       title: question.title,
@@ -191,17 +178,16 @@ export const getQuestionsService = async filters => {
     meta: {
       limit: normalizedLimit,
       total: rows.length,
-      sortBy: 'newest',
+      sortBy: "newest",
       sortOrder: normalizedSortOrder,
     },
   };
 };
 
-//GET /api/questions/:questionHash
-export const getSingleQuestionService = async ({ 
-    questionHash,
-     includeAnswers = true,
-     }) => {
+export const getSingleQuestionService = async ({
+  questionHash,
+  includeAnswers = true,
+}) => {
   const normalizedAnswerLimit = 100; // Fixed max 100 records
 
   const questionSql = `
@@ -225,18 +211,17 @@ export const getSingleQuestionService = async ({
   const questionRows = await safeExecute(questionSql, [questionHash]);
 
   if (questionRows.length === 0) {
-    throw new NotFoundError('Question not found');
+    throw new NotFoundError("Question not found");
   }
-if (!includeAnswers) {
+  if (!includeAnswers) {
     return {
-        question: questionRows[0],
+      question: questionRows[0],
     };
-}
+  }
 
-  // const questionId = question.id;
-    const questionId = questionRows[0].id;
+  const questionId = question.id;
 
-const answersSql = `
+  const answersSql = `
   SELECT
     a.answer_id AS id,
     a.content,
@@ -251,24 +236,24 @@ const answersSql = `
   ORDER BY a.created_at DESC
   LIMIT ${normalizedAnswerLimit}
 `;
-const answers = await safeExecute(answersSql, [questionId]);
+  const answers = await safeExecute(answersSql, [questionId]);
 
-return {
-  question: {
-    id: questionRows[0].id,
-    questionHash: questionRows[0].questionHash,
-    title: questionRows[0].title,
-    content: questionRows[0].content,
-    answerCount: questionRows[0].answerCount,
-    createdAt: questionRows[0].createdAt,
-    updatedAt: questionRows[0].updatedAt,
-    author: {
-      id: questionRows[0].userId,
-      firstName: questionRows[0].firstName,
-      lastName: questionRows[0].lastName,
+  return {
+    question: {
+      id: question.id,
+      questionHash: question.questionHash,
+      title: question.title,
+      content: question.content,
+      answerCount: question.answerCount,
+      createdAt: question.createdAt,
+      updatedAt: question.updatedAt,
+      author: {
+        id: question.userId,
+        firstName: question.firstName,
+        lastName: question.lastName,
+      },
     },
- },
-    answers: answers.map(answer => ({
+    answers: answers.map((answer) => ({
       id: answer.id,
       content: answer.content,
       createdAt: answer.createdAt,
@@ -286,7 +271,7 @@ return {
   };
 };
 
-  /**
+/**
  * Performs semantic search on questions using vector similarity.
  * @param {Object} params - Search parameters
  * @param {string} params.query - The search query text
@@ -301,7 +286,8 @@ export const searchQuestionsSemanticService = async ({
 }) => {
   const sourceText = normalizeQuestionText({ title: query });
   const vectorConfig = getVectorConfig();
-  const searchThreshold =threshold !== undefined ? threshold : vectorConfig.recommendThreshold;
+  const searchThreshold =
+    threshold !== undefined ? threshold : vectorConfig.recommendThreshold;
   const result = await findSimilarQuestionsByText({
     sourceText,
     threshold: searchThreshold,
@@ -324,11 +310,11 @@ export const getSimilarQuestionsService = async ({
   threshold,
 }) => {
   const questionRows = await safeExecute(
-    'SELECT question_id AS id FROM questions WHERE question_hash = ? LIMIT 1',
+    "SELECT question_id AS id FROM questions WHERE question_hash = ? LIMIT 1",
     [questionHash],
   );
   if (questionRows.length === 0) {
-    throw new NotFoundError('Question not found');
+    throw new NotFoundError("Question not found");
   }
   const questionId = questionRows[0].id;
   const vectorConfig = getVectorConfig();
@@ -349,5 +335,3 @@ export const getSimilarQuestionsService = async ({
     },
   };
 };
-
-
