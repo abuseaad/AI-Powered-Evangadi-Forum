@@ -11,6 +11,10 @@ import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute';
 import Auth from './pages/Auth/Auth';
 import Dashboard from './pages/Dashboard/Dashboard';
 import Landing from './pages/Landing/Landing';
+import PostQuestion from './pages/PostQuestion/PostQuestion';
+import MyQuestions from './pages/MyQuestions/MyQuestions';
+import QuestionDetail from './pages/QuestionDetail/QuestionDetail';
+import RagDocuments from './pages/RagDocuments/RagDocuments';
 
 function App() {
   return (
@@ -31,11 +35,11 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
+                      <Route
               path='/questions/ask'
               element={
                 <ProtectedRoute>
-                  <h1>Ask a Question Page</h1>
+                  <PostQuestion />
                 </ProtectedRoute>
               }
             />
@@ -43,7 +47,7 @@ function App() {
               path='/my-questions'
               element={
                 <ProtectedRoute>
-                  <h1>My Questions Page</h1>
+                  <MyQuestions />
                 </ProtectedRoute>
               }
             />
@@ -51,7 +55,7 @@ function App() {
               path='/questions/:questionHash'
               element={
                 <ProtectedRoute>
-                  <h1>Question Detail Page</h1>
+                  <QuestionDetail />
                 </ProtectedRoute>
               }
             />
@@ -59,7 +63,7 @@ function App() {
               path='/question/:id'
               element={
                 <ProtectedRoute>
-                  <h1>Question Detail Page</h1>
+                  <QuestionDetail />
                 </ProtectedRoute>
               }
             />
@@ -67,7 +71,7 @@ function App() {
               path='/rag-documents'
               element={
                 <ProtectedRoute>
-                  <h1>RAG Documents Page</h1>
+                  <RagDocuments />
                 </ProtectedRoute>
               }
             />

@@ -125,11 +125,16 @@ export default function PostQuestion() {
 
     setIsCoaching(true);
     try {
-      const data = await generateQuestionDraftCoach({
+      // const data = await generateQuestionDraftCoach({
+      //   title: formData.title.trim(),
+      //   content: formData.content.trim(),
+      // });
+      // setCoachFeedback(data);
+    const data = await generateQuestionDraftCoach({
         title: formData.title.trim(),
         content: formData.content.trim(),
       });
-      setCoachFeedback(data);
+      setCoachFeedback(data.data);
     } catch (err) {
       setCoachFeedback(null);
       setError(err.message);

@@ -3,7 +3,7 @@ import { safeExecute } from "../../../../db/config.js";
 import { ServiceUnavailableError } from '../../../utils/errors/index.js';
 
 const GEMINI_EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001';
-const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.7-flash';
+const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-3.5-flash-lite';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 const RECOMMEND_THRESHOLD = Number(process.env.RECOMMEND_THRESHOLD) || 0.75;
@@ -89,12 +89,18 @@ Rules:
         'Say what you already tried and what you expected instead.',
       ];
     }
+//     return { tips };
+//   } catch (error) {
+//     throw new ServiceUnavailableError('Failed to generate draft coaching tips');
+//   }
+// };
     return { tips };
   } catch (error) {
+    console.error("[DraftCoach] model:", GEMINI_TEXT_MODEL);
+    console.error("[DraftCoach] error:", error?.message || error);
     throw new ServiceUnavailableError('Failed to generate draft coaching tips');
   }
 };
-
 /**
  * Assesses whether an answer draft addresses the question context.
  * @param {{ questionTitle: string, questionContent: string, answerText: string }} param

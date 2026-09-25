@@ -82,7 +82,7 @@ export const createQuestionWithVectorService = async (payload) => {
       embedding: embeddingResult.embedding,
       status: "ready",
     });
-  } catch (error) {
+   } catch (error) {
     // Log detailed error information if vector generation or storage fails
     console.error("=== FAILED TO STORE VECTOR FOR QUESTION ===");
     console.error("Question ID:", creationResult.id);
@@ -97,13 +97,15 @@ export const createQuestionWithVectorService = async (payload) => {
       embedding: [],
       status: "failed",
     }).catch((e) => console.error("Failed to save failed status", e));
-
-    // Return the created question object
-    return {
-      question: creationResult,
-    };
   }
+
+  // Return the created question object — runs whether the embedding
+  // succeeded OR failed, because the question row itself is already saved.
+  return {
+    question: creationResult,
+  };
 };
+
 
 const buildQuestionFilters = (filters) => {
   const conditions = [];
@@ -219,6 +221,7 @@ export const getSingleQuestionService = async ({
     };
   }
 
+    const question = questionRows[0];
   const questionId = question.id;
 
   const answersSql = `
