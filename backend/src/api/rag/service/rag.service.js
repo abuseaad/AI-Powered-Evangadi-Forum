@@ -8,7 +8,7 @@ import {
   BadRequestError,
   ServiceUnavailableError,
 } from "../../../utils/errors/index.js";
-import { calculateCosineSimilarity } from "../../question/service/vector.service.js";
+import { calculateCosineSimilarity } from "../../questions/service/vector.service.js";
 import { UPLOADS_BASE } from "../rag.upload.config.js";
 
 const GEMINI_EMBEDDING_MODEL =

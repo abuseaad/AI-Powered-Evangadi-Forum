@@ -7,7 +7,6 @@ const GEMINI_EMBEDDING_MODEL =
 	process.env.GEMINI_EMBEDDING_MODEL;
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
 const RECOMMEND_THRESHOLD = Number(process.env.RECOMMEND_THRESHOLD) || 0.75;
 const RECOMMEND_K = Number(process.env.RECOMMEND_K) || 5;
 

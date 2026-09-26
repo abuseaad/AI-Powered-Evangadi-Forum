@@ -22,7 +22,8 @@ import {
 // ============================================================
 // Minimum cosine similarity score (0–1) for a result to be included.
 // 0.75 means only results that are at least 75% similar are returned.
-const RECOMMEND_THRESHOLD = 0.75;
+// const RECOMMEND_THRESHOLD = 0.75;
+const RECOMMEND_THRESHOLD = Number(process.env.RECOMMEND_THRESHOLD) || 0.75;
 
 // Default number of results returned by search/similar endpoints
 const DEFAULT_K = 5;
