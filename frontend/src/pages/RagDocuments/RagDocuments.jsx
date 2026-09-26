@@ -48,6 +48,9 @@ export default function RagDocuments() {
   const [isAsking, setIsAsking] = useState(false);
   const [askError, setAskError] = useState(/** @type {string | null} */ (null));
 
+  /** Which of the three document-view tabs is currently shown. */
+  const [activeTab, setActiveTab] = useState(/** @type {'preview' | 'search' | 'ask'} */ ('preview'));
+
   const selected = documents.find(doc => doc.documentId === selectedId) || null;
   const canUseSelected = selected?.status === 'ready';
 
@@ -370,155 +373,226 @@ export default function RagDocuments() {
 
         <section className={styles.rag__card} aria-labelledby='rag-reader'>
           <h4 id='rag-reader' className={styles.rag__cardTitle}>
-            Reader
+            Active document
           </h4>
           <p className={styles.rag__cardCopy}>
-            Inline preview of the selected PDF.
+            Switch between previewing the PDF, searching it by meaning, or
+            asking a question grounded in its content.
           </p>
-          <div className={styles.rag__preview}>
-            {previewUrl ? (
-              <iframe
-                title={selected?.title || 'PDF preview'}
-                src={previewUrl}
-                className={styles.rag__iframe}
-              />
-            ) : (
-              <div className={styles.rag__previewEmpty} />
-            )}
-          </div>
 
-          <div className={styles.rag__panel}>
-            <h4 className={styles.rag__cardTitle} id='rag-search'>
-              Semantic search
-            </h4>
-            <p className={styles.rag__cardCopy}>
-              Finds passages by meaning (embeddings), not only exact keywords.
-            </p>
-            <form className={styles.rag__stack} onSubmit={handleSearch}>
-              <label className={styles.rag__label} htmlFor='rag-search-query'>
-                Search query
-              </label>
-              <input
-                id='rag-search-query'
-                className={styles.rag__input}
-                value={searchQuery}
-                onChange={event => setSearchQuery(event.target.value)}
-                placeholder='Describe the topic or phrase you are looking for'
-                disabled={!canUseSelected || isSearching}
-              />
-              <div className={styles.rag__actions}>
-                <button
-                  type='submit'
-                  className={styles.rag__primary}
-                  disabled={
-                    !canUseSelected || isSearching || searchQuery.trim().length < 3
-                  }
-                >
-                  <Sparkles size={16} strokeWidth={2.25} aria-hidden />
-                  {isSearching ? 'Searching...' : 'Search'}
-                </button>
-                <button
-                  type='button'
-                  className={styles.rag__secondary}
-                  onClick={handleClearSearch}
-                  disabled={
-                    isSearching ||
-                    (searchQuery.length === 0 &&
-                      searchHits.length === 0 &&
-                      !searchError)
-                  }
-                >
-                  Clear
-                </button>
-              </div>
-            </form>
-            {searchError ? (
-              <p className={styles.rag__error} role='alert'>
-                {searchError}
-              </p>
-            ) : null}
-            {searchHits.length > 0 ? (
-              <ul className={styles.rag__hits}>
-                {searchHits.map(hit => (
-                  <li
-                    key={`${hit.chunkId}-${hit.chunkIndex}`}
-                    className={styles.rag__hit}
-                  >
-                    <p className={styles.rag__hitScore}>
-                      Score {Number(hit.score).toFixed(4)}
-                    </p>
-                    <p className={styles.rag__hitText}>{hit.excerpt}</p>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-
-          <div className={styles.rag__panel}>
-            <h4 className={styles.rag__cardTitle} id='rag-ask'>
-              Ask with AI
-            </h4>
-            <p className={styles.rag__cardCopy}>
-              Answers use only retrieved excerpts from this PDF, with citations
-              where possible. When the document includes code, the reply may
-              show it in formatted blocks you can copy.
-            </p>
-            <form className={styles.rag__stack} onSubmit={handleAsk}>
-              <label className={styles.rag__label} htmlFor='rag-ask-query'>
-                Question
-              </label>
-              <textarea
-                id='rag-ask-query'
-                className={styles.rag__textarea}
-                rows={4}
-                value={askQuery}
-                onChange={event => setAskQuery(event.target.value)}
-                placeholder='What does this PDF recommend for route persistence?'
-                disabled={!canUseSelected || isAsking}
-              />
-              <div className={styles.rag__actions}>
-                <button
-                  type='submit'
-                  className={styles.rag__primary}
-                  disabled={
-                    !canUseSelected || isAsking || askQuery.trim().length < 3
-                  }
-                >
-                  <Sparkles size={16} strokeWidth={2.25} aria-hidden />
-                  {isAsking ? 'Asking...' : 'Ask'}
-                </button>
-                <button
-                  type='button'
-                  className={styles.rag__secondary}
-                  onClick={handleClearAsk}
-                  disabled={
-                    isAsking || (!askQuery && !askAnswer && !askError)
-                  }
-                >
-                  Clear
-                </button>
-              </div>
-            </form>
-            {askError ? (
-              <p className={styles.rag__error} role='alert'>
-                {askError}
-              </p>
-            ) : null}
-            {askAnswer ? <RagAnswerBody>{askAnswer}</RagAnswerBody> : null}
-          </div>
-
-          <div className={styles.rag__clearAllRow}>
+          <div className={styles.rag__tabs} role='tablist' aria-label='Document view'>
             <button
               type='button'
-              className={`${styles.rag__secondary} ${styles.rag__clearAll}`}
-              onClick={handleClearAll}
-              disabled={
-                isSearching || isAsking || (!searchHasContent && !askHasContent)
-              }
+              role='tab'
+              id='rag-tab-preview'
+              aria-selected={activeTab === 'preview'}
+              aria-controls='rag-tabpanel-preview'
+              className={`${styles.rag__tab} ${
+                activeTab === 'preview' ? styles['rag__tab--active'] : ''
+              }`}
+              onClick={() => setActiveTab('preview')}
             >
-              Clear all
+              PDF Preview
+            </button>
+            <button
+              type='button'
+              role='tab'
+              id='rag-tab-search'
+              aria-selected={activeTab === 'search'}
+              aria-controls='rag-tabpanel-search'
+              className={`${styles.rag__tab} ${
+                activeTab === 'search' ? styles['rag__tab--active'] : ''
+              }`}
+              onClick={() => setActiveTab('search')}
+            >
+              Semantic Search
+            </button>
+            <button
+              type='button'
+              role='tab'
+              id='rag-tab-ask'
+              aria-selected={activeTab === 'ask'}
+              aria-controls='rag-tabpanel-ask'
+              className={`${styles.rag__tab} ${
+                activeTab === 'ask' ? styles['rag__tab--active'] : ''
+              }`}
+              onClick={() => setActiveTab('ask')}
+            >
+              Ask AI
             </button>
           </div>
+
+          {activeTab === 'preview' ? (
+            <div
+              role='tabpanel'
+              id='rag-tabpanel-preview'
+              aria-labelledby='rag-tab-preview'
+            >
+              <p className={styles.rag__cardCopy}>
+                Inline preview of the selected PDF.
+              </p>
+              <div className={styles.rag__preview}>
+                {previewUrl ? (
+                  <iframe
+                    title={selected?.title || 'PDF preview'}
+                    src={previewUrl}
+                    className={styles.rag__iframe}
+                  />
+                ) : (
+                  <div className={styles.rag__previewEmpty} />
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {activeTab === 'search' ? (
+            <div
+              role='tabpanel'
+              id='rag-tabpanel-search'
+              aria-labelledby='rag-tab-search'
+              className={styles.rag__panel}
+            >
+              <h4 className={styles.rag__cardTitle} id='rag-search'>
+                Semantic search
+              </h4>
+              <p className={styles.rag__cardCopy}>
+                Finds passages by meaning (embeddings), not only exact keywords.
+              </p>
+              <form className={styles.rag__stack} onSubmit={handleSearch}>
+                <label className={styles.rag__label} htmlFor='rag-search-query'>
+                  Search query
+                </label>
+                <input
+                  id='rag-search-query'
+                  className={styles.rag__input}
+                  value={searchQuery}
+                  onChange={event => setSearchQuery(event.target.value)}
+                  placeholder='Describe the topic or phrase you are looking for'
+                  disabled={!canUseSelected || isSearching}
+                />
+                <div className={styles.rag__actions}>
+                  <button
+                    type='submit'
+                    className={styles.rag__primary}
+                    disabled={
+                      !canUseSelected || isSearching || searchQuery.trim().length < 3
+                    }
+                  >
+                    <Sparkles size={16} strokeWidth={2.25} aria-hidden />
+                    {isSearching ? 'Searching...' : 'Search'}
+                  </button>
+                  <button
+                    type='button'
+                    className={styles.rag__secondary}
+                    onClick={handleClearSearch}
+                    disabled={
+                      isSearching ||
+                      (searchQuery.length === 0 &&
+                        searchHits.length === 0 &&
+                        !searchError)
+                    }
+                  >
+                    Clear
+                  </button>
+                </div>
+              </form>
+              {searchError ? (
+                <p className={styles.rag__error} role='alert'>
+                  {searchError}
+                </p>
+              ) : null}
+              {searchHits.length > 0 ? (
+                <ul className={styles.rag__hits}>
+                  {searchHits.map(hit => (
+                    <li
+                      key={`${hit.chunkId}-${hit.chunkIndex}`}
+                      className={styles.rag__hit}
+                    >
+                      <p className={styles.rag__hitScore}>
+                        Score {Number(hit.score).toFixed(4)}
+                      </p>
+                      <p className={styles.rag__hitText}>{hit.excerpt}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+
+          {activeTab === 'ask' ? (
+            <div
+              role='tabpanel'
+              id='rag-tabpanel-ask'
+              aria-labelledby='rag-tab-ask'
+              className={styles.rag__panel}
+            >
+              <h4 className={styles.rag__cardTitle} id='rag-ask'>
+                Ask with AI
+              </h4>
+              <p className={styles.rag__cardCopy}>
+                Answers use only retrieved excerpts from this PDF, with citations
+                where possible. When the document includes code, the reply may
+                show it in formatted blocks you can copy.
+              </p>
+              <form className={styles.rag__stack} onSubmit={handleAsk}>
+                <label className={styles.rag__label} htmlFor='rag-ask-query'>
+                  Question
+                </label>
+                <textarea
+                  id='rag-ask-query'
+                  className={styles.rag__textarea}
+                  rows={4}
+                  value={askQuery}
+                  onChange={event => setAskQuery(event.target.value)}
+                  placeholder='What does this PDF recommend for route persistence?'
+                  disabled={!canUseSelected || isAsking}
+                />
+                <div className={styles.rag__actions}>
+                  <button
+                    type='submit'
+                    className={styles.rag__primary}
+                    disabled={
+                      !canUseSelected || isAsking || askQuery.trim().length < 3
+                    }
+                  >
+                    <Sparkles size={16} strokeWidth={2.25} aria-hidden />
+                    {isAsking ? 'Asking...' : 'Ask'}
+                  </button>
+                  <button
+                    type='button'
+                    className={styles.rag__secondary}
+                    onClick={handleClearAsk}
+                    disabled={
+                      isAsking || (!askQuery && !askAnswer && !askError)
+                    }
+                  >
+                    Clear
+                  </button>
+                </div>
+              </form>
+              {askError ? (
+                <p className={styles.rag__error} role='alert'>
+                  {askError}
+                </p>
+              ) : null}
+              {askAnswer ? <RagAnswerBody>{askAnswer}</RagAnswerBody> : null}
+            </div>
+          ) : null}
+
+          {activeTab !== 'preview' ? (
+            <div className={styles.rag__clearAllRow}>
+              <button
+                type='button'
+                className={`${styles.rag__secondary} ${styles.rag__clearAll}`}
+                onClick={handleClearAll}
+                disabled={
+                  isSearching || isAsking || (!searchHasContent && !askHasContent)
+                }
+              >
+                Clear all
+              </button>
+            </div>
+          ) : null}
         </section>
       </div>
     </div>

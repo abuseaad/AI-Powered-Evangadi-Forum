@@ -154,6 +154,36 @@
   background-color: #fff7ed;
 }
 
+.rag__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.75rem 0 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.rag__tab {
+  padding: 0.55rem 0.95rem;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-secondary);
+  background-color: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transform: translateY(1px);
+}
+
+.rag__tab:hover {
+  color: var(--text-primary);
+}
+
+.rag__tab--active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
 .rag__actions {
   display: flex;
   flex-wrap: wrap;
