@@ -292,4 +292,4 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ## Author
 
-Built by [abuseaad](https://github.com/abuseaad).
+Built by [Sadik Jemal]
