@@ -9,6 +9,7 @@ import swaggerSpec from './src/docs/swagger.js';
 const app = express();
 const port = process.env.PORT || 3777;
 
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -53,6 +54,7 @@ const startServer = async () => {
     connection.release();
 
     app.listen(port, err => {
+      app.listen(port, '0.0.0.0', err => {
       if (err) {
         console.error('Failed to start the server:', err.message);
         process.exit(1);
