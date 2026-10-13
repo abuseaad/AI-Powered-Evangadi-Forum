@@ -4,9 +4,9 @@ A full-stack question-and-answer forum with AI built in. Users can ask and answe
 
 This is my personal version of the Evangadi forum project that I first built as part of a team.
 
-- **Backend API (Railway):** https://ai-powered-evangadi-forum-production.up.railway.app
+- **Backend API (Railway):**#
 - **API docs (Swagger):** `/api/docs` on the backend URL above
-- **Live frontend (Vercel):** <!-- TODO: paste your .vercel.app link here -->
+- **Live frontend (Vercel):** https://evangadi-ai-forum-nu.vercel.app/
 
 ---
 
