@@ -1,9 +1,10 @@
-import "dotenv/config";
 import express from 'express';
 import { db } from './db/config.js';
 import { mainRouter } from './src/api/routes.js';
-import errorHandler from './src/middleware/error-handler.js';
+import { errorHandler } from './src/middleware/error-handler.js';
 import cors from 'cors';
+import swaggerUi from 'swagger-ui-express';
+import swaggerSpec from './src/docs/swagger.js';
 
 const app = express();
 const port = process.env.PORT || 3777;
@@ -18,6 +19,26 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
+// ── Swagger UI ──────────────────────────────────────────────────────────────
+app.use(
+  '/api/docs',
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customSiteTitle: 'Evangadi Forum API Docs',
+    swaggerOptions: {
+      persistAuthorization: true, // keeps the JWT in the Authorize box across reloads
+      displayRequestDuration: true,
+      filter: true,
+      tryItOutEnabled: true,
+    },
+  }),
+);
+
+// Raw spec (for external tools like Postman import)
+app.get('/api/docs.json', (_req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
 app.use('/api', mainRouter);
 
 app.use(errorHandler);
@@ -25,7 +46,9 @@ app.use(errorHandler);
 // Start server
 const startServer = async () => {
   try {
+    // Test database connection
     const connection = await db.getConnection();
+
     console.log('Database connection established successfully.');
     connection.release();
 

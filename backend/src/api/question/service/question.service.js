@@ -1,17 +1,15 @@
 import crypto from "crypto";
 import { safeExecute } from "../../../../db/config.js";
-import {
-  BadRequestError,
-  NotFoundError,
-} from "../../../utils/errors/index.js";
+import { BadRequestError, NotFoundError } from "../../../utils/errors/index.js";
 import {
   findSimilarQuestionsByQuestionId,
   findSimilarQuestionsByText,
   generateQuestionEmbedding,
   getVectorConfig,
   normalizeQuestionText,
+  reEmbedFailedQuestions,
   storeQuestionVector,
-} from './vector.service.js';
+} from "./vector.service.js";
 
 const generateQuestionHash = () => crypto.randomBytes(8).toString("hex");
 
@@ -64,16 +62,16 @@ export const createQuestionWithVectorService = async (payload) => {
     userId,
   };
 
-  // Normalize the question text (e.g., title) to prepare it for vector embedding
+  // Normalize title + content together so the embedding captures full meaning
   const sourceText = normalizeQuestionText({
     title: payload.title,
+    content: payload.content,
   });
 
   try {
     // Generate the vector embedding for the normalized question text
-    const embeddingResult = await generateQuestionEmbedding(sourceText, {
-      questionId: creationResult.id,
-    });
+    // taskType defaults to RETRIEVAL_DOCUMENT — correct for storing indexed content
+    const embeddingResult = await generateQuestionEmbedding(sourceText);
 
     // Store the generated vector embedding in the database with a 'ready' status
     await storeQuestionVector({
@@ -82,7 +80,7 @@ export const createQuestionWithVectorService = async (payload) => {
       embedding: embeddingResult.embedding,
       status: "ready",
     });
-   } catch (error) {
+  } catch (error) {
     // Log detailed error information if vector generation or storage fails
     console.error("=== FAILED TO STORE VECTOR FOR QUESTION ===");
     console.error("Question ID:", creationResult.id);
@@ -99,13 +97,11 @@ export const createQuestionWithVectorService = async (payload) => {
     }).catch((e) => console.error("Failed to save failed status", e));
   }
 
-  // Return the created question object — runs whether the embedding
-  // succeeded OR failed, because the question row itself is already saved.
+  // Return the created question object
   return {
     question: creationResult,
   };
 };
-
 
 const buildQuestionFilters = (filters) => {
   const conditions = [];
@@ -221,8 +217,7 @@ export const getSingleQuestionService = async ({
     };
   }
 
-    const question = questionRows[0];
-  const questionId = question.id;
+  const questionId = questionRows[0].id;
 
   const answersSql = `
   SELECT
@@ -243,17 +238,17 @@ export const getSingleQuestionService = async ({
 
   return {
     question: {
-      id: question.id,
-      questionHash: question.questionHash,
-      title: question.title,
-      content: question.content,
-      answerCount: question.answerCount,
-      createdAt: question.createdAt,
-      updatedAt: question.updatedAt,
+      id: questionRows[0].id,
+      questionHash: questionRows[0].questionHash,
+      title: questionRows[0].title,
+      content: questionRows[0].content,
+      answerCount: questionRows[0].answerCount,
+      createdAt: questionRows[0].createdAt,
+      updatedAt: questionRows[0].updatedAt,
       author: {
-        id: question.userId,
-        firstName: question.firstName,
-        lastName: question.lastName,
+        id: questionRows[0].userId,
+        firstName: questionRows[0].firstName,
+        lastName: questionRows[0].lastName,
       },
     },
     answers: answers.map((answer) => ({
@@ -305,6 +300,10 @@ export const searchQuestionsSemanticService = async ({
       total: result.similarQuestions.length,
     },
   };
+};
+
+export const backfillFailedEmbeddingsService = async () => {
+  return await reEmbedFailedQuestions();
 };
 
 export const getSimilarQuestionsService = async ({

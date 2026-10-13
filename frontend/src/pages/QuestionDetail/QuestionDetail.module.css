@@ -428,3 +428,126 @@
     position: static;
   }
 }
+/* ── Empty answers state ─────────────────────────────────────────────────── */
+.emptyAnswers {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 3rem 2rem;
+  background: var(--surface-container-low, #f9fafb);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.emptyAnswersIcon {
+  color: var(--text-muted, #9ca3af);
+  margin-bottom: 0.25rem;
+}
+
+.emptyAnswersTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.emptyAnswersSubtitle {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted, #6b7280);
+  max-width: 36rem;
+  line-height: 1.55;
+}
+
+/* ── Answer editor (toolbar + textarea) ──────────────────────────────────── */
+.answerEditor {
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface, #fff);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.answerEditor:focus-within {
+  border-color: var(--primary, #f97316);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+}
+
+.answerToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.7rem;
+  background: var(--surface-container-low, #f9fafb);
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.answerToolbarGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.answerTool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #6b7280);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s;
+}
+
+.answerTool:hover:not(:disabled) {
+  background: var(--surface, #fff);
+  color: var(--text-primary, #111827);
+}
+
+.answerTool:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.answerToolDivider {
+  width: 1px;
+  height: 0.9rem;
+  margin: 0 0.3rem;
+  background: var(--border, #e5e7eb);
+}
+
+.answerCharCount {
+  font-size: 0.72rem;
+  color: var(--text-tertiary, #9ca3af);
+  white-space: nowrap;
+}
+
+.answerEditorTextarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  padding: 0.75rem 1rem;
+  border: none;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--text-primary, #111827);
+  background: transparent;
+  box-sizing: border-box;
+  min-height: 10rem;
+}
+
+.answerEditorTextarea:focus {
+  outline: none;
+}
+
+.answerEditorTextarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

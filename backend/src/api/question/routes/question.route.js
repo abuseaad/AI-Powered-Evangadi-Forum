@@ -1,6 +1,7 @@
 import express from "express";
 import { authenticateUser } from "../../../middleware/authentication.js";
 import {
+  backfillEmbeddingsController,
   createQuestionController,
   getQuestionsController,
   getSingleQuestionController,
@@ -37,6 +38,11 @@ router.get(
 // POST /api/questions/draft-coach
 // Defined before /:questionHash so "draft-coach" is not captured as a hash param
 router.post("/draft-coach", generateQuestionDraftCoachController);
+
+// POST /api/questions/backfill-embeddings
+// Re-embeds any question with status='failed' or no vector row.
+// Call once after fixing a Gemini API key or model issue.
+router.post("/backfill-embeddings", backfillEmbeddingsController);
 
 // GET /api/questions/:questionHash
 router.get(

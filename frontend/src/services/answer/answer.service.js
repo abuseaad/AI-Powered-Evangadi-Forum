@@ -5,4 +5,14 @@ async function postAnswer(questionId, content) {
   return response.data;
 }
 
-export const answerService = { postAnswer };
+async function updateAnswer(answerId, content) {
+  const response = await apiClient.put(`/api/answers/${answerId}`, { content });
+  return response.data;
+}
+
+async function deleteAnswer(answerId) {
+  const response = await apiClient.delete(`/api/answers/${answerId}`);
+  return response.data;
+}
+
+export const answerService = { postAnswer, updateAnswer, deleteAnswer };

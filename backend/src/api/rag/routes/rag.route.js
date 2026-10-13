@@ -1,7 +1,5 @@
-import express from 'express';
-import { authenticateUser } from '../../../middleware/authentication.js';
-import { BadRequestError } from '../../../utils/errors/index.js';
-import { uploadPdf } from '../rag.upload.config.js';
+import express from "express";
+import { authenticateUser } from "../../../middleware/authentication.js";
 import {
   createDocumentController,
   listDocumentsController,
@@ -10,70 +8,55 @@ import {
   deleteDocumentController,
   searchInDocumentController,
   queryDocumentController,
-} from '../controller/rag.controller.js';
+} from "../controller/rag.controller.js";
 import {
   documentIdParamValidation,
-  searchInDocumentValidation,
+  searchDocumentValidation,
   queryDocumentValidation,
-} from '../validation/rag.validation.js';
-
+} from "../validation/rag.validation.js";
+import {
+  upload,
+  createDocumentMulterErrorHandler,
+} from "../rag.upload.config.js";
 const router = express.Router();
-
 router.use(authenticateUser);
-
-/**
- * Wraps multer's single-file upload so a file-related failure (wrong type,
- * too large, no user folder) becomes a normal BadRequestError instead of
- * an unhandled multer error, matching every other error in this app.
- */
-function handleUpload(req, res, next) {
-  uploadPdf.single('file')(req, res, (err) => {
-    if (err) {
-      return next(new BadRequestError(err.message || 'Failed to upload file.'));
-    }
-    next();
-  });
-}
-
-// GET /api/rag/documents
-router.get('/documents', listDocumentsController);
-
-// POST /api/rag/documents  (multipart/form-data, field name "file")
-router.post('/documents', handleUpload, createDocumentController);
-
-// GET /api/rag/documents/:documentId
-router.get(
-  '/documents/:documentId',
-  documentIdParamValidation,
-  getDocumentMetaController,
+// POST /api/rag/documents
+router.post(
+  "/",
+  upload.single("file"),
+  createDocumentMulterErrorHandler,
+  createDocumentController,
 );
-
-// GET /api/rag/documents/:documentId/file  (raw PDF bytes, for the reader)
+// GET /api/rag/documents
+router.get("/", listDocumentsController);
+// GET /api/rag/documents/:documentId/file — must come before /:documentId to avoid ambiguity
 router.get(
-  '/documents/:documentId/file',
+  "/:documentId/file",
   documentIdParamValidation,
   getDocumentFileController,
 );
-
-// GET /api/rag/documents/:documentId/search?query=...&k=...
+// GET /api/rag/documents/:documentId/search
 router.get(
-  '/documents/:documentId/search',
-  searchInDocumentValidation,
+  "/:documentId/search",
+  searchDocumentValidation,
   searchInDocumentController,
 );
-
-// POST /api/rag/documents/:documentId/query  { query }
+// POST /api/rag/documents/:documentId/query
 router.post(
-  '/documents/:documentId/query',
+  "/:documentId/query",
   queryDocumentValidation,
   queryDocumentController,
 );
-
+// GET /api/rag/documents/:documentId
+router.get(
+  "/:documentId",
+  documentIdParamValidation,
+  getDocumentMetaController,
+);
 // DELETE /api/rag/documents/:documentId
 router.delete(
-  '/documents/:documentId',
+  "/:documentId",
   documentIdParamValidation,
   deleteDocumentController,
 );
-
 export default router;

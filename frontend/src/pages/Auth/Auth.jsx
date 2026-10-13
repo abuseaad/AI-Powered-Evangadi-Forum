@@ -20,7 +20,7 @@ export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
   const { register, login } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
+   const [isLogin, setIsLogin] = useState(!location.state?.signup);
 
   // Registration form state
   const [firstName, setFirstName] = useState('');
@@ -286,6 +286,7 @@ export default function Auth() {
                     className={styles.auth__input}
                     value={email}
                     onChange={e => setEmail(e.target.value)}
+                    autoComplete={isLogin ? 'email' : 'off'}
                   />
                 </div>
 
@@ -303,6 +304,9 @@ export default function Auth() {
                       className={`${styles.auth__input} ${styles.auth__inputPassword}`}
                       value={password}
                       onChange={e => setPassword(e.target.value)}
+                      autoComplete={
+                        isLogin ? 'current-password' : 'new-password'
+                      }
                     />
                     <button
                       type='button'

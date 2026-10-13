@@ -2,7 +2,7 @@
  * PostQuestion: ask form plus AI Draft Coach, then POST /api/questions.
  * Route: `/questions/ask`.
  */
-import { useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bold,
@@ -26,6 +26,33 @@ const TITLE_MAX = 255;
 /** Minimum trimmed details length required by the API. */
 const CONTENT_MIN = 10;
 
+const URL_RE = /^https?:\/\/\S+$/;
+
+/** Returns true when pasted text looks like a code snippet. */
+function looksLikeCode(text) {
+  const lines = text.split('\n');
+  if (lines.length < 2) return false;
+  const hasIndent = lines.some(l => /^[ \t]{2,}\S/.test(l));
+  const hasSyntax = /[{}();]|=>|->/.test(text) ||
+    /\b(def |function |const |let |var |class |import |return |print\(|console\.)/.test(text);
+  return hasIndent || hasSyntax;
+}
+
+/** Guesses a language tag for a fenced code block. */
+function detectLang(code) {
+  if (/^\s*<(!DOCTYPE|html|head|body|div|p |span|a |ul|ol|li|script|style|form|input)/im.test(code))
+    return 'html';
+  if (/\bdef \w+\s*\(|^\s*(import |from )\w|:\s*$|\belif\b|\bprint\s*\(/m.test(code))
+    return 'python';
+  if (/\b(interface |type |enum |namespace )\w/.test(code) ||
+    /:\s*(string|number|boolean|void|any)\b/.test(code))
+    return 'typescript';
+  if (/\b(const|let|var|function|=>|async |await )\b/.test(code)) return 'javascript';
+  if (/^\s*[.#]?[\w-]+\s*\{[\s\S]*?\}/m.test(code)) return 'css';
+  if (/^\s*SELECT |^\s*INSERT |^\s*UPDATE |^\s*CREATE /im.test(code)) return 'sql';
+  return '';
+}
+
 /**
  * Renders the ask-question form, optional AI tips, and the published success card.
  *
@@ -34,6 +61,7 @@ const CONTENT_MIN = 10;
 export default function PostQuestion() {
   const navigate = useNavigate();
   const textareaRef = useRef(null);
+  const pendingSelection = useRef(null);
   const [formData, setFormData] = useState({ title: '', content: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCoaching, setIsCoaching] = useState(false);
@@ -49,6 +77,60 @@ export default function PostQuestion() {
   const showSuccess = Boolean(success);
 
   /**
+   * Smart paste:
+   *  - Bare URL + text selected  → [selected](url)
+   *  - Bare URL + no selection   → [](url), cursor between brackets
+   *  - Multi-line code snippet   → ```lang\ncode\n```, cursor after block
+   *  - Anything else             → default browser paste
+   */
+  const handleContentPaste = useCallback(
+    e => {
+      const raw   = e.clipboardData?.getData('text') ?? '';
+      const pasted = raw.trim();
+
+      // Already fenced — let it through unchanged
+      if (pasted.startsWith('```')) return;
+
+      const el      = textareaRef.current;
+      const start   = el?.selectionStart ?? formData.content.length;
+      const end     = el?.selectionEnd   ?? formData.content.length;
+      const content = formData.content;
+
+      // ── URL paste ────────────────────────────────────────────────────────
+      if (URL_RE.test(pasted)) {
+        e.preventDefault();
+        const hasSelection = start !== end;
+        if (hasSelection) {
+          const selected = content.slice(start, end);
+          const link = `[${selected}](${pasted})`;
+          const next = content.slice(0, start) + link + content.slice(end);
+          pendingSelection.current = { start: start + link.length, end: start + link.length };
+          setFormData(cur => ({ ...cur, content: next }));
+        } else {
+          const link = `[](${pasted})`;
+          const next = content.slice(0, start) + link + content.slice(end);
+          pendingSelection.current = { start: start + 1, end: start + 1 };
+          setFormData(cur => ({ ...cur, content: next }));
+        }
+        return;
+      }
+
+      // ── Code snippet paste ───────────────────────────────────────────────
+      if (looksLikeCode(pasted)) {
+        e.preventDefault();
+        const lang  = detectLang(pasted);
+        const fence = `\`\`\`${lang}\n${pasted}\n\`\`\``;
+        const next  = content.slice(0, start) + fence + content.slice(end);
+        const cursorPos = start + fence.length;
+        pendingSelection.current = { start: cursorPos, end: cursorPos };
+        setFormData(cur => ({ ...cur, content: next }));
+      }
+      // else: normal text — browser handles it
+    },
+    [formData.content],
+  );
+
+  /**
    * Updates one form field and clears that field's validation error.
    *
    * @param {'title'|'content'} field - The field being typed.
@@ -62,20 +144,77 @@ export default function PostQuestion() {
   };
 
   /**
-   * Wraps the selected details text with markdown markers.
+   * Restores the cursor/selection saved by applyMarkdown or applyCodeBlock
+   * after React re-renders the controlled textarea with the new value.
+   */
+  useLayoutEffect(() => {
+    if (pendingSelection.current === null) return;
+    const { start, end } = pendingSelection.current;
+    pendingSelection.current = null;
+    const el = textareaRef.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(start, end);
+  }, [formData.content]);
+
+  /**
+   * Wraps the selected details text with markdown markers and restores
+   * the cursor to a useful position after the re-render.
    *
    * @param {string} before - Opening markdown.
-   * @param {string} [after] - Closing markdown.
-   * @returns {void} The selected details text is wrapped in markdown.
+   * @param {string} [after] - Closing markdown (defaults to `before`).
+   * @returns {void}
    */
   const applyMarkdown = (before, after = before) => {
     const content = formData.content;
     const el = textareaRef.current;
     const start = el?.selectionStart ?? content.length;
     const end = el?.selectionEnd ?? content.length;
-    const selected = content.slice(start, end) || 'text';
+    const hadSelection = start !== end;
+    const selected = hadSelection ? content.slice(start, end) : 'text';
     const next =
       content.slice(0, start) + before + selected + after + content.slice(end);
+
+    let selStart, selEnd;
+    if (after === '](url)') {
+      // Link: select the "url" placeholder so the user can type the URL right away
+      selStart = start + before.length + selected.length + 2; // skip `](`
+      selEnd = selStart + 3; // length of "url"
+    } else if (!hadSelection) {
+      // No prior selection: select the "text" placeholder for immediate replacement
+      selStart = start + before.length;
+      selEnd = selStart + selected.length;
+    } else {
+      // Had a selection: place cursor after the closing marker
+      selStart = start + before.length + selected.length + after.length;
+      selEnd = selStart;
+    }
+
+    pendingSelection.current = { start: selStart, end: selEnd };
+    setFormData(current => ({ ...current, content: next }));
+  };
+
+  /**
+   * Wraps the selected text in a fenced code block and positions the cursor
+   * inside the block for immediate editing.
+   *
+   * @returns {void}
+   */
+  const applyCodeBlock = () => {
+    const content = formData.content;
+    const el = textareaRef.current;
+    const start = el?.selectionStart ?? content.length;
+    const end = el?.selectionEnd ?? content.length;
+    const hadSelection = start !== end;
+    const selected = hadSelection ? content.slice(start, end) : 'code here';
+    const block = '```\n' + selected + '\n```';
+    const next = content.slice(0, start) + block + content.slice(end);
+
+    // Select the code content between the fence markers
+    pendingSelection.current = {
+      start: start + 4, // after "```\n"
+      end: start + 4 + selected.length,
+    };
     setFormData(current => ({ ...current, content: next }));
   };
 
@@ -125,16 +264,12 @@ export default function PostQuestion() {
 
     setIsCoaching(true);
     try {
-      // const data = await generateQuestionDraftCoach({
-      //   title: formData.title.trim(),
-      //   content: formData.content.trim(),
-      // });
-      // setCoachFeedback(data);
-    const data = await generateQuestionDraftCoach({
+      const data = await generateQuestionDraftCoach({
         title: formData.title.trim(),
         content: formData.content.trim(),
       });
-      setCoachFeedback(data.data);
+      // Backend wraps tips under data.data.tips — unwrap it
+      setCoachFeedback(data?.data ?? data);
     } catch (err) {
       setCoachFeedback(null);
       setError(err.message);
@@ -164,7 +299,7 @@ export default function PostQuestion() {
         title: formData.title.trim(),
         content: formData.content.trim(),
       });
-      setPublishedHash(created?.questionHash || null);
+      setPublishedHash(created?.data?.questionHash || null);
       setSuccess('Thread published');
     } catch (err) {
       const message = err.message || 'Failed to post question.';
@@ -351,6 +486,7 @@ export default function PostQuestion() {
                     <button
                       type='button'
                       className={styles.postQuestion__tool}
+                      onMouseDown={e => e.preventDefault()}
                       onClick={() => applyMarkdown('**')}
                       title='Bold'
                       disabled={isBusy}
@@ -360,6 +496,7 @@ export default function PostQuestion() {
                     <button
                       type='button'
                       className={styles.postQuestion__tool}
+                      onMouseDown={e => e.preventDefault()}
                       onClick={() => applyMarkdown('*')}
                       title='Italic'
                       disabled={isBusy}
@@ -370,8 +507,9 @@ export default function PostQuestion() {
                     <button
                       type='button'
                       className={styles.postQuestion__tool}
-                      onClick={() => applyMarkdown('`')}
-                      title='Code'
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={applyCodeBlock}
+                      title='Code block'
                       disabled={isBusy}
                     >
                       <Code size={15} />
@@ -379,8 +517,9 @@ export default function PostQuestion() {
                     <button
                       type='button'
                       className={styles.postQuestion__tool}
+                      onMouseDown={e => e.preventDefault()}
                       onClick={() => applyMarkdown('[', '](url)')}
-                      title='Link'
+                      title='Link — or select text then paste a URL'
                       disabled={isBusy}
                     >
                       <Link2 size={15} />
@@ -390,12 +529,14 @@ export default function PostQuestion() {
                     {formData.content.length} characters
                   </span>
                 </div>
+
                 <textarea
                   id='question-content'
                   ref={textareaRef}
                   className={styles.postQuestion__textarea}
                   value={formData.content}
                   onChange={handleFieldChange('content')}
+                  onPaste={handleContentPaste}
                   placeholder='Include all the information someone would need to answer your question... You can use Markdown to format your code!'
                   rows={10}
                   disabled={isBusy}

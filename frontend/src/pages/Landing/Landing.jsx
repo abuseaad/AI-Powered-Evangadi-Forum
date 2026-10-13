@@ -104,7 +104,7 @@ export default function Landing() {
                 <button
                   type='button'
                   className={styles.landing__btnPrimary}
-                  onClick={() => navigate('/auth')}
+                 onClick={() => navigate('/auth', { state: { signup: true } })}
                 >
                   Create account
                 </button>

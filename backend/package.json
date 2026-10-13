@@ -4,7 +4,6 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-
     "dev": "node --watch index.js",
     "start": "node index.js",
     "test": "node --test"
@@ -25,7 +24,8 @@
     "multer": "^2.1.1",
     "mysql2": "^3.18.2",
     "nodemon": "^3.1.14",
-    "pdf-parse": "^2.4.5"
+    "pdf-parse": "^2.4.5",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

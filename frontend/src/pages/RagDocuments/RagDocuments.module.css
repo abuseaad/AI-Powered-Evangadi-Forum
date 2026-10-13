@@ -353,6 +353,7 @@
   border-radius: 0.75rem;
 }
 
+
 .rag__textarea {
   resize: vertical;
   min-height: 6.5rem;
@@ -393,7 +394,53 @@
   line-height: 1.6;
   color: var(--text-secondary);
 }
+.rag__citationBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.55rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: var(--font-bold);
+  font-family: ui-monospace, monospace;
+  color: #fff;
+  background-color: var(--primary);
+  border-radius: 0.4rem;
+  letter-spacing: 0;
+  flex-shrink: 0;
+}
 
+.rag__sourceRefs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0.75rem 0 0;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background-color: var(--surface-container-low);
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+}
+
+.rag__sourceRefsLabel {
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  margin-right: 0.2rem;
+}
+
+.rag__sourceRefsItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.rag__sourceRefsDot {
+  color: var(--text-tertiary);
+  margin-left: 0.1rem;
+}
 .rag__muted {
   margin: 1rem 0 0;
   font-size: var(--text-sm);

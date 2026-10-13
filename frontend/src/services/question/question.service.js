@@ -77,7 +77,12 @@ export async function searchQuestionsSemantic(query, { k, threshold } = {}) {
     if (k !== undefined) params.k = k;
     if (threshold !== undefined) params.threshold = threshold;
 
-    const response = await apiClient.get('/api/questions/search', { params });
+    // STEP 2 (Edit A): semantic search calls Gemini before querying the DB,
+    // so it can take longer than the default 10s timeout.
+    const response = await apiClient.get('/api/questions/search', {
+      params,
+      timeout: 30000,
+    });
     const payload = response.data;
 
     const results = Array.isArray(payload?.data)
@@ -89,6 +94,36 @@ export async function searchQuestionsSemantic(query, { k, threshold } = {}) {
     return {
       data: results,
       meta: payload?.meta || { total: results.length, query },
+    };
+  } catch (error) {
+    throw handleQuestionError(error);
+  }
+}
+
+// STEP 2 (Edit B): new function, was missing in your file.
+/**
+ * Fetches questions semantically similar to the given question hash.
+ * @param {string} questionHash
+ * @param {Object} [options]
+ * @param {number} [options.k] - Max results to return
+ * @param {number} [options.threshold] - Cosine similarity cutoff (0-1)
+ * @returns {Promise<{ data: Array, meta: Object }>}
+ */
+export async function getSimilarQuestions(questionHash, { k, threshold } = {}) {
+  try {
+    const params = {};
+    if (k !== undefined) params.k = k;
+    if (threshold !== undefined) params.threshold = threshold;
+
+    const response = await apiClient.get(
+      `/api/questions/${questionHash}/similar`,
+      { params, timeout: 30000 },
+    );
+    const payload = response.data;
+
+    return {
+      data: Array.isArray(payload?.data) ? payload.data : [],
+      meta: payload?.meta || {},
     };
   } catch (error) {
     throw handleQuestionError(error);
@@ -166,6 +201,7 @@ export async function assessAnswerFit(questionHash, answerText) {
 export const questionService = {
   getQuestions,
   searchQuestionsSemantic,
+  getSimilarQuestions, // STEP 2 (Edit C): added so QuestionDetail.jsx can call it
   getSingleQuestion,
   createQuestion,
   generateQuestionDraftCoach,

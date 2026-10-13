@@ -1,4 +1,4 @@
-import { StatusCodes } from 'http-status-codes';
+import { StatusCodes } from "http-status-codes";
 
 class CustomAPIError extends Error {
   constructor(message) {
@@ -26,7 +26,7 @@ export class UnauthenticatedError extends CustomAPIError {
     this.statusCode = StatusCodes.UNAUTHORIZED; // 401
   }
 }
-// Added by me
+
 export class ForbiddenError extends CustomAPIError {
   constructor(message) {
     super(message);

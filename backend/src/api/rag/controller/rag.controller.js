@@ -64,7 +64,6 @@ export const getDocumentMetaController = async (req, res, next) => {
 export const getDocumentFileController = async (req, res, next) => {
   try {
     const { documentId } = req.params;
-    // Reuse getDocumentMetaService — it already returns storage_path and validates ownership
     const doc = await getDocumentMetaService(documentId, req.user.id);
     const absolutePath = path.join(UPLOADS_BASE, doc.storage_path);
 

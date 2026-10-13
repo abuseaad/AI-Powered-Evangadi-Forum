@@ -1,14 +1,76 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
-import { ArrowLeft, Sparkles } from 'lucide-react';
+import {
+  ArrowLeft, Sparkles, Pencil, Trash2, Share2, MessageSquare,
+  Bold, Italic, Code, Link2,
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { questionService } from '../../services/question/question.service';
 import { answerService } from '../../services/answer/answer.service';
 import { timeAgo } from '../../lib/utils';
+import { autoFormatMarkdown } from '../../lib/markdownFormatter';
+import HighlightedCodeBlock from '../../components/HighlightedCodeBlock/HighlightedCodeBlock';
 import styles from './QuestionDetail.module.css';
 
 const MIN_ANSWER_LENGTH = 20;
+
+// STEP 9: helpers for smart paste in the answer editor
+const URL_RE = /^https?:\/\/\S+$/;
+
+function looksLikeCode(text) {
+  const lines = text.split('\n');
+  if (lines.length < 2) return false;
+  const hasIndent = lines.some(l => /^[ \t]{2,}\S/.test(l));
+  const hasSyntax =
+    /[{}();]|=>|->/.test(text) ||
+    /\b(def |function |const |let |var |class |import |return |print\(|console\.)/.test(text);
+  return hasIndent || hasSyntax;
+}
+
+function detectLang(code) {
+  if (/^\s*<(!DOCTYPE|html|head|body|div|p |span|a |ul|ol|li|script|style|form|input)/im.test(code))
+    return 'html';
+  if (/\bdef \w+\s*\(|^\s*(import |from )\w|:\s*$|\belif\b|\bprint\s*\(/m.test(code))
+    return 'python';
+  if (/\b(interface |type |enum |namespace )\w/.test(code) ||
+    /:\s*(string|number|boolean|void|any)\b/.test(code))
+    return 'typescript';
+  if (/\b(const|let|var|function|=>|async |await )\b/.test(code)) return 'javascript';
+  if (/^\s*[.#]?[\w-]+\s*\{[\s\S]*?\}/m.test(code)) return 'css';
+  if (/^\s*SELECT |^\s*INSERT |^\s*UPDATE |^\s*CREATE /im.test(code)) return 'sql';
+  return '';
+}
+
+const markdownComponents = {
+  a: ({ node, ...props }) => (
+    <a
+      {...props}
+      className={styles.markdownLink}
+      target={props.href?.startsWith('http') ? '_blank' : undefined}
+      rel={props.href?.startsWith('http') ? 'noopener noreferrer' : undefined}
+    />
+  ),
+  pre: ({ children }) => <>{children}</>,
+  code: ({ node, inline, className, children, ...props }) => {
+    const isFence =
+      Boolean(className?.trim()) ||
+      (!inline && typeof children === 'string' && children.includes('\n'));
+
+    if (isFence) {
+      return (
+        <HighlightedCodeBlock className={className}>
+          {children}
+        </HighlightedCodeBlock>
+      );
+    }
+    return (
+      <code className={styles.inlineCode} {...props}>
+        {children}
+      </code>
+    );
+  },
+};
 
 const AVATAR_PALETTE = [
   '#06b6d4', '#10b981', '#84cc16', '#f59e0b',
@@ -47,6 +109,101 @@ export default function QuestionDetail() {
   const [isCheckingFit, setIsCheckingFit] = useState(false);
   const [fitResult, setFitResult] = useState(null);
   const [fitError, setFitError] = useState(null);
+
+  // Edit answer state
+  const [editingAnswerId, setEditingAnswerId] = useState(null);
+  const [editText, setEditText] = useState('');
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState(null);
+  const [isEditCheckingFit, setIsEditCheckingFit] = useState(false);
+  const [editFitResult, setEditFitResult] = useState(null);
+  const [editFitError, setEditFitError] = useState(null);
+  const [deletingAnswerId, setDeletingAnswerId] = useState(null);
+
+  // STEP 9: answer editor toolbar + smart paste
+  const answerTextareaRef = useRef(null);
+  const pendingAnswerSelection = useRef(null);
+
+  // Restore cursor / selection after the textarea value changes
+  useLayoutEffect(() => {
+    if (pendingAnswerSelection.current === null) return;
+    const { start, end } = pendingAnswerSelection.current;
+    pendingAnswerSelection.current = null;
+    const el = answerTextareaRef.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(start, end);
+  }, [answerText]);
+
+  const applyAnswerMarkdown = useCallback((before, after = before) => {
+    const el = answerTextareaRef.current;
+    const start = el?.selectionStart ?? answerText.length;
+    const end = el?.selectionEnd ?? answerText.length;
+    const hadSelection = start !== end;
+    const selected = hadSelection ? answerText.slice(start, end) : 'text';
+    const next =
+      answerText.slice(0, start) + before + selected + after + answerText.slice(end);
+
+    let selStart, selEnd;
+    if (after === '](url)') {
+      selStart = start + before.length + selected.length + 2; // skip `](`
+      selEnd = selStart + 3; // select the word "url"
+    } else if (!hadSelection) {
+      selStart = start + before.length;
+      selEnd = selStart + selected.length;
+    } else {
+      selStart = start + before.length + selected.length + after.length;
+      selEnd = selStart;
+    }
+    pendingAnswerSelection.current = { start: selStart, end: selEnd };
+    setAnswerText(next);
+    setFitResult(null);
+  }, [answerText]);
+
+  const applyAnswerCodeBlock = useCallback(() => {
+    const el = answerTextareaRef.current;
+    const start = el?.selectionStart ?? answerText.length;
+    const end = el?.selectionEnd ?? answerText.length;
+    const hadSelection = start !== end;
+    const selected = hadSelection ? answerText.slice(start, end) : 'code here';
+    const block = '```\n' + selected + '\n```';
+    const next = answerText.slice(0, start) + block + answerText.slice(end);
+    pendingAnswerSelection.current = { start: start + 4, end: start + 4 + selected.length };
+    setAnswerText(next);
+    setFitResult(null);
+  }, [answerText]);
+
+  const handleAnswerPaste = useCallback(e => {
+    const pasted = (e.clipboardData?.getData('text') ?? '').trim();
+    if (pasted.startsWith('```')) return; // already fenced
+
+    const el = answerTextareaRef.current;
+    const start = el?.selectionStart ?? answerText.length;
+    const end = el?.selectionEnd ?? answerText.length;
+
+    if (URL_RE.test(pasted)) {
+      e.preventDefault();
+      if (start !== end) {
+        const link = `[${answerText.slice(start, end)}](${pasted})`;
+        pendingAnswerSelection.current = { start: start + link.length, end: start + link.length };
+        setAnswerText(answerText.slice(0, start) + link + answerText.slice(end));
+      } else {
+        const link = `[](${pasted})`;
+        pendingAnswerSelection.current = { start: start + 1, end: start + 1 };
+        setAnswerText(answerText.slice(0, start) + link + answerText.slice(end));
+      }
+      setFitResult(null);
+      return;
+    }
+
+    if (looksLikeCode(pasted)) {
+      e.preventDefault();
+      const fence = '```' + detectLang(pasted) + '\n' + pasted + '\n```';
+      pendingAnswerSelection.current = { start: start + fence.length, end: start + fence.length };
+      setAnswerText(answerText.slice(0, start) + fence + answerText.slice(end));
+      setFitResult(null);
+    }
+  }, [answerText]);
 
   // Fetch question + answers
   useEffect(() => {
@@ -123,6 +280,67 @@ export default function QuestionDetail() {
     }
   }, [answerText, question]);
 
+  const handleEditStart = useCallback((answer) => {
+    setEditingAnswerId(answer.id);
+    setEditText(answer.content);
+    setEditError(null);
+    setEditFitResult(null);
+    setEditFitError(null);
+  }, []);
+
+  const handleEditCancel = useCallback(() => {
+    setEditingAnswerId(null);
+    setEditText('');
+    setEditError(null);
+    setEditFitResult(null);
+    setEditFitError(null);
+  }, []);
+
+  const handleEditCheckFit = useCallback(async () => {
+    if (editText.length < MIN_ANSWER_LENGTH) return;
+    setIsEditCheckingFit(true);
+    setEditFitResult(null);
+    setEditFitError(null);
+    try {
+      const data = await questionService.assessAnswerFit(questionHash, editText);
+      setEditFitResult(data.data);
+    } catch (err) {
+      setEditFitError(err.message || 'Could not check answer fit.');
+    } finally {
+      setIsEditCheckingFit(false);
+    }
+  }, [editText, questionHash]);
+
+  const handleEditSave = useCallback(async (answerId) => {
+    if (editText.length < MIN_ANSWER_LENGTH) return;
+    setIsEditSubmitting(true);
+    setEditError(null);
+    try {
+      const data = await answerService.updateAnswer(answerId, editText);
+      setAnswers(prev => prev.map(a => a.id === answerId ? data.answer : a));
+      setEditingAnswerId(null);
+      setEditText('');
+      setEditFitResult(null);
+    } catch (err) {
+      setEditError(err.response?.data?.message || 'Failed to update answer.');
+    } finally {
+      setIsEditSubmitting(false);
+    }
+  }, [editText]);
+
+  const handleDeleteAnswer = useCallback(async (answerId) => {
+    if (!window.confirm('Delete this answer?')) return;
+    setDeletingAnswerId(answerId);
+    try {
+      await answerService.deleteAnswer(answerId);
+      setAnswers(prev => prev.filter(a => a.id !== answerId));
+    } catch (err) {
+      console.error('Failed to delete answer:', err);
+    } finally {
+      setDeletingAnswerId(null);
+    }
+  }, []);
+
   // ── Loading state ──────────────────────────────────────────────────────────
   if (isLoading) {
     return (
@@ -156,6 +374,11 @@ export default function QuestionDetail() {
     : fitResult?.level === 'partial' ? styles.fitPartial
     : fitResult?.level === 'weak' ? styles.fitWeak
     : '';
+  const editFitLevelClass =
+    editFitResult?.level === 'strong' ? styles.fitStrong
+    : editFitResult?.level === 'partial' ? styles.fitPartial
+    : editFitResult?.level === 'weak' ? styles.fitWeak
+    : '';
 
   const authorName = `${question.author.firstName} ${question.author.lastName}`.trim();
   const authorInitials = getInitials(question.author.firstName, question.author.lastName);
@@ -186,15 +409,44 @@ export default function QuestionDetail() {
             >
               {authorInitials}
             </div>
-            <span className={styles.questionMeta}>
-              {authorName} &middot; {timeAgo(question.createdAt)}
-            </span>
+            <div className={styles.authorInfoCol}>
+              <span className={styles.authorNameText}>{authorName}</span>
+              <span className={styles.questionMeta}>Posted {timeAgo(question.createdAt)}</span>
+            </div>
           </div>
 
           <h1 className={styles.questionTitle}>{question.title}</h1>
 
           <div className={styles.questionBody}>
-            <ReactMarkdown>{question.content}</ReactMarkdown>
+            <ReactMarkdown components={markdownComponents}>
+              {autoFormatMarkdown(question.content)}
+            </ReactMarkdown>
+          </div>
+
+          <div className={styles.questionFooterBar}>
+            <button
+              type='button'
+              className={styles.actionPill}
+              onClick={() => {
+                if (navigator.clipboard) {
+                  navigator.clipboard.writeText(window.location.href);
+                  alert('Link copied to clipboard!');
+                }
+              }}
+            >
+              <Share2 size={13} />
+              Share
+            </button>
+            <button
+              type='button'
+              className={styles.actionPill}
+              onClick={() => {
+                document.getElementById('post-answer-section')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            >
+              <MessageSquare size={13} />
+              {answers.length} {answers.length === 1 ? 'Answer' : 'Answers'}
+            </button>
           </div>
         </div>
 
@@ -205,11 +457,19 @@ export default function QuestionDetail() {
           </h2>
 
           {answers.length === 0 ? (
-            <p className={styles.emptyNote}>No answers yet — be the first!</p>
+            <div className={styles.emptyAnswers}>
+              <MessageSquare size={32} className={styles.emptyAnswersIcon} aria-hidden='true' />
+              <p className={styles.emptyAnswersTitle}>Be the first to help!</p>
+              <p className={styles.emptyAnswersSubtitle}>
+                This question is waiting for an expert like you. Share your knowledge and earn reputation points.
+              </p>
+            </div>
           ) : (
             <ul className={styles.answerList}>
               {answers.map(answer => {
                 const aName = `${answer.author.firstName} ${answer.author.lastName}`.trim();
+                const isOwnAnswer = user && answer.author.id === user.id;
+                const isEditing = editingAnswerId === answer.id;
                 return (
                   <li key={answer.id} className={styles.answerCard}>
                     <div className={styles.answerAuthorRow}>
@@ -220,13 +480,95 @@ export default function QuestionDetail() {
                       >
                         {getInitials(answer.author.firstName, answer.author.lastName)}
                       </div>
-                      <span className={styles.answerMeta}>
-                        {aName} &middot; {timeAgo(answer.createdAt)}
-                      </span>
+                      <div className={styles.authorInfoCol}>
+                        <span className={styles.authorNameText}>{aName}</span>
+                        <span className={styles.answerMeta}>
+                          {timeAgo(answer.createdAt)}
+                          {answer.updatedAt && answer.updatedAt !== answer.createdAt && (
+                            <span className={styles.editedBadge}> (edited)</span>
+                          )}
+                        </span>
+                      </div>
+                      {isOwnAnswer && !isEditing && (
+                        <div className={styles.answerActions}>
+                          <button
+                            type='button'
+                            className={styles.answerActionBtn}
+                            onClick={() => handleEditStart(answer)}
+                            title='Edit answer'
+                          >
+                            <Pencil size={12} />
+                            Edit
+                          </button>
+                          <button
+                            type='button'
+                            className={`${styles.answerActionBtn} ${styles.answerActionBtnDanger}`}
+                            onClick={() => handleDeleteAnswer(answer.id)}
+                            disabled={deletingAnswerId === answer.id}
+                            title='Delete answer'
+                          >
+                            <Trash2 size={12} />
+                            {deletingAnswerId === answer.id ? 'Deleting…' : 'Delete'}
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div className={styles.answerBody}>
-                      <ReactMarkdown>{answer.content}</ReactMarkdown>
-                    </div>
+
+                    {isEditing ? (
+                      <div className={styles.editForm}>
+                        <textarea
+                          className={styles.answerTextarea}
+                          value={editText}
+                          onChange={e => {
+                            setEditText(e.target.value);
+                            setEditFitResult(null);
+                          }}
+                          rows={5}
+                          disabled={isEditSubmitting}
+                        />
+                        {editFitResult && (
+                          <div className={`${styles.fitPanel} ${editFitLevelClass}`}>
+                            <strong>AI Answer Fit: {editFitResult.level}</strong>
+                            <p>{editFitResult.note}</p>
+                          </div>
+                        )}
+                        {editFitError && <p className={styles.errorText}>{editFitError}</p>}
+                        {editError && <p className={styles.errorText}>{editError}</p>}
+                        <div className={styles.formActions}>
+                          <button
+                            type='button'
+                            onClick={handleEditCheckFit}
+                            disabled={editText.length < MIN_ANSWER_LENGTH || isEditCheckingFit || isEditSubmitting}
+                            className={`${styles.btn} ${styles.btnSecondary}`}
+                          >
+                            <Sparkles size={13} />
+                            {isEditCheckingFit ? 'Checking…' : 'Check Answer Fit'}
+                          </button>
+                          <button
+                            type='button'
+                            onClick={handleEditCancel}
+                            disabled={isEditSubmitting}
+                            className={`${styles.btn} ${styles.btnSecondary}`}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type='button'
+                            onClick={() => handleEditSave(answer.id)}
+                            disabled={editText.length < MIN_ANSWER_LENGTH || isEditSubmitting}
+                            className={`${styles.btn} ${styles.btnPrimary}`}
+                          >
+                            {isEditSubmitting ? 'Saving…' : 'Save'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={styles.answerBody}>
+                        <ReactMarkdown components={markdownComponents}>
+                          {autoFormatMarkdown(answer.content)}
+                        </ReactMarkdown>
+                      </div>
+                    )}
                   </li>
                 );
               })}
@@ -238,20 +580,73 @@ export default function QuestionDetail() {
         {isOwnQuestion ? (
           <p className={styles.ownQuestionNote}>You cannot answer your own question.</p>
         ) : (
-          <section className={styles.postAnswerSection}>
+          <section id='post-answer-section' className={styles.postAnswerSection}>
             <h2 className={styles.sectionHeading}>Your Answer</h2>
             <form onSubmit={handlePostAnswer} className={styles.answerForm}>
-              <textarea
-                className={styles.answerTextarea}
-                value={answerText}
-                onChange={e => {
-                  setAnswerText(e.target.value);
-                  setFitResult(null);
-                }}
-                placeholder='Write your answer here (min 20 characters)...'
-                rows={6}
-                disabled={isSubmitting}
-              />
+              <div className={styles.answerEditor}>
+                <div className={styles.answerToolbar}>
+                  <div className={styles.answerToolbarGroup}>
+                    <button
+                      type='button'
+                      className={styles.answerTool}
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => applyAnswerMarkdown('**')}
+                      title='Bold'
+                      disabled={isSubmitting}
+                    >
+                      <Bold size={14} />
+                    </button>
+                    <button
+                      type='button'
+                      className={styles.answerTool}
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => applyAnswerMarkdown('*')}
+                      title='Italic'
+                      disabled={isSubmitting}
+                    >
+                      <Italic size={14} />
+                    </button>
+                    <span className={styles.answerToolDivider} />
+                    <button
+                      type='button'
+                      className={styles.answerTool}
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={applyAnswerCodeBlock}
+                      title='Code block'
+                      disabled={isSubmitting}
+                    >
+                      <Code size={14} />
+                    </button>
+                    <button
+                      type='button'
+                      className={styles.answerTool}
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => applyAnswerMarkdown('[', '](url)')}
+                      title='Link — or select text then paste a URL'
+                      disabled={isSubmitting}
+                    >
+                      <Link2 size={14} />
+                    </button>
+                  </div>
+                  <span className={styles.answerCharCount}>
+                    {answerText.length} characters
+                  </span>
+                </div>
+
+                <textarea
+                  ref={answerTextareaRef}
+                  className={styles.answerEditorTextarea}
+                  value={answerText}
+                  onChange={e => {
+                    setAnswerText(e.target.value);
+                    setFitResult(null);
+                  }}
+                  onPaste={handleAnswerPaste}
+                  placeholder='Write your answer here (min 20 characters). You can use Markdown to format your code!'
+                  rows={8}
+                  disabled={isSubmitting}
+                />
+              </div>
 
               {fitResult && (
                 <div className={`${styles.fitPanel} ${fitLevelClass}`}>
@@ -302,25 +697,21 @@ export default function QuestionDetail() {
           ) : (
             <ul className={styles.relatedList}>
               {relatedQuestions.map(q => (
-                <li
-                  key={q.id}
-                  className={styles.relatedItem}
-                  onClick={() => navigate(`/questions/${q.questionHash}`)}
-                  role='button'
-                  tabIndex={0}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      navigate(`/questions/${q.questionHash}`);
-                    }
-                  }}
-                >
-                  <p className={styles.relatedItemTitle}>{q.title}</p>
-                  <p className={styles.relatedItemMeta}>
-                    {q.author.firstName} {q.author.lastName}
-                    &nbsp;&middot;&nbsp;
-                    {timeAgo(q.createdAt)}
-                  </p>
+                <li key={q.id} className={styles.relatedItem}>
+                  <Link
+                    to={`/questions/${q.questionHash}`}
+                    className={styles.relatedLink}
+                  >
+                    <p className={styles.relatedItemTitle}>{q.title}</p>
+                    <div className={styles.relatedItemMetaRow}>
+                      <span className={styles.relatedItemMeta}>
+                        {q.author?.firstName} {q.author?.lastName}
+                      </span>
+                      <span className={styles.relatedItemDate}>
+                        {timeAgo(q.createdAt)}
+                      </span>
+                    </div>
+                  </Link>
                 </li>
               ))}
             </ul>

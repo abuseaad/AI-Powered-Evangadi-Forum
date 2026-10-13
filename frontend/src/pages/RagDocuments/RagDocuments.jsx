@@ -45,6 +45,7 @@ export default function RagDocuments() {
 
   const [askQuery, setAskQuery] = useState('');
   const [askAnswer, setAskAnswer] = useState(/** @type {string | null} */ (null));
+  const [askCitations, setAskCitations] = useState(/** @type {Array<{ref:number,chunkIndex:number}>} */ ([]));
   const [isAsking, setIsAsking] = useState(false);
   const [askError, setAskError] = useState(/** @type {string | null} */ (null));
 
@@ -212,6 +213,7 @@ export default function RagDocuments() {
   const handleClearAsk = () => {
     setAskQuery('');
     setAskAnswer(null);
+    setAskCitations([]);
     setAskError(null);
   };
 
@@ -244,9 +246,11 @@ export default function RagDocuments() {
     setIsAsking(true);
     setAskError(null);
     setAskAnswer(null);
+    setAskCitations([]); // STEP 7 (Edit C)
     try {
       const data = await queryDocument(selectedId, askQuery.trim());
       setAskAnswer(data?.answer || '');
+      setAskCitations(Array.isArray(data?.citations) ? data.citations : []); // STEP 7 (Edit C)
     } catch (error) {
       setAskError(error.message || 'Could not get an answer.');
     } finally {
@@ -345,6 +349,7 @@ export default function RagDocuments() {
                       setSearchHits([]);
                       setSearchError(null);
                       setAskAnswer(null);
+                      setAskCitations([]); // STEP 7 (extra): clear old sources when switching PDFs
                       setAskError(null);
                     }}
                   >
@@ -503,12 +508,16 @@ export default function RagDocuments() {
               ) : null}
               {searchHits.length > 0 ? (
                 <ul className={styles.rag__hits}>
-                  {searchHits.map(hit => (
+                  {/* STEP 7 (Edit D): numbered citation badge on each hit */}
+                  {searchHits.map((hit, index) => (
                     <li
                       key={`${hit.chunkId}-${hit.chunkIndex}`}
                       className={styles.rag__hit}
                     >
                       <p className={styles.rag__hitScore}>
+                        <span className={styles.rag__citationBadge}>
+                          [{index + 1}]
+                        </span>
                         Score {Number(hit.score).toFixed(4)}
                       </p>
                       <p className={styles.rag__hitText}>{hit.excerpt}</p>
@@ -576,6 +585,21 @@ export default function RagDocuments() {
                 </p>
               ) : null}
               {askAnswer ? <RagAnswerBody>{askAnswer}</RagAnswerBody> : null}
+              {/* STEP 7 (Edit E): source references under the answer */}
+              {askCitations.length > 0 ? (
+                <p className={styles.rag__sourceRefs}>
+                  <span className={styles.rag__sourceRefsLabel}>Source references:</span>
+                  {askCitations.map((c, i) => (
+                    <span key={i} className={styles.rag__sourceRefsItem}>
+                      <span className={styles.rag__citationBadge}>[{c.ref}]</span>
+                      {' → chunk '}{c.chunkIndex}
+                      {i < askCitations.length - 1 ? (
+                        <span className={styles.rag__sourceRefsDot}> · </span>
+                      ) : null}
+                    </span>
+                  ))}
+                </p>
+              ) : null}
             </div>
           ) : null}
 

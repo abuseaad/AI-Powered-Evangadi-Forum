@@ -100,45 +100,48 @@ export default function Dashboard() {
 
   /**
    * Fetches questions matching the current search parameters.
+   * The `isCancelled` ref is owned by the effect so cleanup can flip it
+   * before any in-flight setState calls fire.
    */
-  const fetchFeedData = useCallback(async () => {
-    let isCancelled = false;
-    setIsLoading(true);
-    setError(null);
+  const fetchFeedData = useCallback(
+    async (signal) => {
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      let result;
-      if (searchMode === 'semantic') {
-        result = await questionService.searchQuestionsSemantic(semanticQuery);
-      } else if (searchMode === 'keyword') {
-        result = await questionService.getQuestions({ search: keywordQuery });
-      } else {
-        result = await questionService.getQuestions();
-      }
+      try {
+        let result;
+        if (searchMode === 'semantic') {
+          result = await questionService.searchQuestionsSemantic(semanticQuery);
+        } else if (searchMode === 'keyword') {
+          result = await questionService.getQuestions({ search: keywordQuery });
+        } else {
+          result = await questionService.getQuestions();
+        }
 
-      if (!isCancelled) {
-        setQuestions(result?.data || []);
+        if (!signal.cancelled) {
+          setQuestions(result?.data || []);
+        }
+      } catch (err) {
+        if (!signal.cancelled) {
+          setError(err?.message || 'Failed to load questions.');
+          setQuestions([]);
+        }
+      } finally {
+        if (!signal.cancelled) {
+          setIsLoading(false);
+        }
       }
-    } catch (err) {
-      if (!isCancelled) {
-        setError(err?.message || 'Failed to load questions.');
-        setQuestions([]);
-      }
-    } finally {
-      if (!isCancelled) {
-        setIsLoading(false);
-      }
-    }
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [searchMode, semanticQuery, keywordQuery]);
+    },
+    [searchMode, semanticQuery, keywordQuery],
+  );
 
   useEffect(() => {
-    const cancel = fetchFeedData();
+    // Cancellation signal object — flipped to true in the cleanup function
+    // so any setState calls from a stale fetch are safely dropped.
+    const signal = { cancelled: false };
+    fetchFeedData(signal);
     return () => {
-      if (typeof cancel === 'function') cancel();
+      signal.cancelled = true;
     };
   }, [fetchFeedData]);
 
@@ -259,35 +262,38 @@ export default function Dashboard() {
             : 'Figures below describe the newest threads in this feed (up to 100 from the API).'}
         </p>
 
-        {/* 4 Metric / Statistics Tiles */}
-        {!isLoading && (
-          <div
-            className={styles.dashboard__stats}
-            role='region'
-            aria-label='Feed Statistics'
-          >
-            <div className={styles.dashboard__statCard}>
-              <span className={styles.dashboard__statLabel}>Questions</span>
-              <span className={styles.dashboard__statValue}>{stats.total}</span>
-            </div>
-            <div className={styles.dashboard__statCard}>
-              <span className={styles.dashboard__statLabel}>Replies</span>
-              <span className={styles.dashboard__statValue}>
-                {stats.replies}
-              </span>
-            </div>
-            <div className={styles.dashboard__statCard}>
-              <span className={styles.dashboard__statLabel}>Unanswered</span>
-              <span className={styles.dashboard__statValue}>
-                {stats.unanswered}
-              </span>
-            </div>
-            <div className={styles.dashboard__statCard}>
-              <span className={styles.dashboard__statLabel}>Yours</span>
-              <span className={styles.dashboard__statValue}>{stats.yours}</span>
-            </div>
+        {/* 4 Metric / Statistics Tiles — always visible; show 0 while loading */}
+        <div
+          className={styles.dashboard__stats}
+          role='region'
+          aria-label='Feed Statistics'
+          aria-busy={isLoading}
+        >
+          <div className={styles.dashboard__statCard}>
+            <span className={styles.dashboard__statLabel}>Questions</span>
+            <span className={styles.dashboard__statValue}>
+              {isLoading ? '—' : stats.total}
+            </span>
           </div>
-        )}
+          <div className={styles.dashboard__statCard}>
+            <span className={styles.dashboard__statLabel}>Replies</span>
+            <span className={styles.dashboard__statValue}>
+              {isLoading ? '—' : stats.replies}
+            </span>
+          </div>
+          <div className={styles.dashboard__statCard}>
+            <span className={styles.dashboard__statLabel}>Unanswered</span>
+            <span className={styles.dashboard__statValue}>
+              {isLoading ? '—' : stats.unanswered}
+            </span>
+          </div>
+          <div className={styles.dashboard__statCard}>
+            <span className={styles.dashboard__statLabel}>Yours</span>
+            <span className={styles.dashboard__statValue}>
+              {isLoading ? '—' : stats.yours}
+            </span>
+          </div>
+        </div>
       </section>
 
       {/* ============================================================
@@ -345,7 +351,10 @@ export default function Dashboard() {
               <button
                 type='button'
                 className={styles.dashboard__errorButton}
-                onClick={fetchFeedData}
+                onClick={() => {
+                  const signal = { cancelled: false };
+                  fetchFeedData(signal);
+                }}
               >
                 <RefreshCw size={12} style={{ marginRight: '0.35rem' }} />
                 Try again

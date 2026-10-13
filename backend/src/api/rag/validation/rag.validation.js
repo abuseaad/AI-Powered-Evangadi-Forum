@@ -1,50 +1,43 @@
-import { body, param, query } from 'express-validator';
-import { validationErrorHandler } from '../../../middleware/validation-handler.js';
+import { param, query, body } from "express-validator";
+import { validationErrorHandler } from "../../../middleware/validation-handler.js";
 
-/** Validates the :documentId route param on any single-document endpoint. */
 export const documentIdParamValidation = [
-  param('documentId')
+  param("documentId")
     .isInt({ min: 1 })
-    .withMessage('documentId must be a positive integer')
+    .withMessage("Document ID must be a positive integer")
     .toInt(),
   validationErrorHandler,
 ];
 
-/** GET /api/rag/documents/:documentId/search?query=...&k=... */
-export const searchInDocumentValidation = [
-  param('documentId')
+export const searchDocumentValidation = [
+  param("documentId")
     .isInt({ min: 1 })
-    .withMessage('documentId must be a positive integer')
+    .withMessage("Document ID must be a positive integer")
     .toInt(),
-  query('query')
+  query("query")
     .notEmpty()
-    .withMessage('query is required')
+    .withMessage("Query is required")
     .isString()
-    .withMessage('query must be a string')
-    .isLength({ min: 3 })
-    .withMessage('query must be at least 3 characters')
+    .withMessage("Query must be a string")
     .trim(),
-  query('k')
+  query("k")
     .optional()
     .isInt({ min: 1, max: 20 })
-    .withMessage('k must be an integer between 1 and 20')
+    .withMessage("k must be an integer between 1 and 20")
     .toInt(),
   validationErrorHandler,
 ];
 
-/** POST /api/rag/documents/:documentId/query */
 export const queryDocumentValidation = [
-  param('documentId')
+  param("documentId")
     .isInt({ min: 1 })
-    .withMessage('documentId must be a positive integer')
+    .withMessage("Document ID must be a positive integer")
     .toInt(),
-  body('query')
+  body("query")
     .notEmpty()
-    .withMessage('query is required')
+    .withMessage("Query is required")
     .isString()
-    .withMessage('query must be a string')
-    .isLength({ min: 3 })
-    .withMessage('query must be at least 3 characters')
+    .withMessage("Query must be a string")
     .trim(),
   validationErrorHandler,
 ];

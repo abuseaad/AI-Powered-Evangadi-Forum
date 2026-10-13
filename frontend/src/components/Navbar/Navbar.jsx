@@ -27,25 +27,29 @@ export default function Navbar({ title, subtitle, user, onLogout }) {
     }
   }, [location.search, location.pathname]);
 
-  // Debounced keyword search: updates `?q=` on the dashboard (500ms quiet period).
+  // Debounced keyword search — only fires when in keyword mode (?q=).
+  // We MUST NOT overwrite an active ?semantic= param with ?q=, otherwise
+  // clicking "AI Search" gets undone 500ms later by this effect.
   useEffect(() => {
+    // If the URL already has ?semantic=, the user explicitly chose AI Search —
+    // skip the keyword debounce entirely so we don't clobber it.
+    const currentParams = new URLSearchParams(location.search);
+    if (currentParams.get('semantic')) return;
+
     const delayDebounceFn = setTimeout(() => {
       if (searchTerm.trim() !== '') {
         navigate(`/dashboard?q=${encodeURIComponent(searchTerm)}`);
-      } else if (
-        location.pathname === '/dashboard' &&
-        !new URLSearchParams(location.search).get('semantic')
-      ) {
+      } else if (location.pathname === '/dashboard') {
         navigate('/dashboard');
       }
     }, 500);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, navigate, location.pathname]);
+  }, [searchTerm, navigate, location.pathname, location.search]);
 
   const handleSemanticSearch = e => {
     e.preventDefault();
-    if (searchTerm.trim().length >= 3) {
+    if (searchTerm.trim().length >= 5) {
       navigate(`/dashboard?semantic=${encodeURIComponent(searchTerm)}`);
     }
   };
@@ -79,7 +83,7 @@ export default function Navbar({ title, subtitle, user, onLogout }) {
           className={styles['navbar__search-input']}
           aria-label='Search questions by keyword'
         />
-        {searchTerm.length >= 3 && (
+        {searchTerm.length >= 5 && (
           <button
             type='button'
             onClick={handleSemanticSearch}

@@ -25,6 +25,19 @@ function getInitials(firstName = '', lastName = '') {
   return `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase() || '?';
 }
 
+const AVATAR_PALETTE = [
+  '#06b6d4', '#10b981', '#84cc16', '#f59e0b',
+  '#8b5cf6', '#3b82f6', '#ec4899', '#f97316',
+];
+
+function getAvatarBg(name = '') {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+}
+
 export default function MyQuestions() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -58,6 +71,9 @@ export default function MyQuestions() {
   }, [retryCount]);
 
   const initials = getInitials(user?.firstName, user?.lastName);
+  const avatarBg = getAvatarBg(
+    `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User',
+  );
 
   return (
     <div className={styles.page}>
@@ -116,7 +132,13 @@ export default function MyQuestions() {
                   navigate(`/questions/${q.questionHash}`)
                 }
               >
-                <div className={styles.card__avatar}>{initials}</div>
+                <div
+                  className={styles.card__avatar}
+                  style={{ backgroundColor: avatarBg }}
+                  aria-hidden='true'
+                >
+                  {initials}
+                </div>
                 <div className={styles.card__body}>
                   <div className={styles.card__topRow}>
                     <h3 className={styles.card__title}>{q.title}</h3>

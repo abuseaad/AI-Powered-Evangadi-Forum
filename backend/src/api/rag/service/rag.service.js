@@ -8,7 +8,7 @@ import {
   BadRequestError,
   ServiceUnavailableError,
 } from "../../../utils/errors/index.js";
-import { calculateCosineSimilarity } from "../../questions/service/vector.service.js";
+import { calculateCosineSimilarity } from "../../question/service/vector.service.js";
 import { UPLOADS_BASE } from "../rag.upload.config.js";
 
 const GEMINI_EMBEDDING_MODEL =
@@ -144,7 +144,12 @@ export async function assertOwnedDocument(documentId, userId) {
  * @returns {Promise<object>} the created document row
  */
 export async function createDocumentFromUploadService({ file, userId }) {
-  const storagePath = `${userId}/${file.filename}`;
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const storagePath = `${userId}/${unique}.pdf`;
+  const absPath = path.join(UPLOADS_BASE, storagePath);
+
+  await fs.mkdir(path.dirname(absPath), { recursive: true });
+  await fs.writeFile(absPath, file.buffer);
 
   const insertResult = await safeExecute(
     `INSERT INTO documents (user_id, title, mime_type, byte_size, status, storage_path)
@@ -161,7 +166,7 @@ export async function createDocumentFromUploadService({ file, userId }) {
   };
 
   try {
-    const fileBuffer = await fs.readFile(file.path);
+    const fileBuffer = file.buffer;
     const parser = new PDFParse({ data: fileBuffer });
     const pdfData = await parser.getText();
     await parser.destroy();
