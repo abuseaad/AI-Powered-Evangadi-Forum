@@ -53,7 +53,7 @@ const startServer = async () => {
     console.log('Database connection established successfully.');
     connection.release();
 
-    app.listen(port, err => {
+    // app.listen(port, err => {
       app.listen(port, '0.0.0.0', err => {
       if (err) {
         console.error('Failed to start the server:', err.message);
